@@ -85,9 +85,53 @@ public final class VASTAdSession: ObservableObject {
     /// What is known about the ad surface being on screen. Reported by the
     /// surface itself; see `VASTSurfacePresence` for what it can and cannot see.
     public private(set) var surfacePresence = VASTSurfacePresence()
+    /// One complaint per ad: the control is re-measured on every layout pass, and
+    /// a warning repeated forty times a second helps nobody.
+    private var reportedSkipControlProblem = false
 
     func noteSurface(size: CGSize) {
         surfacePresence.update(size: size)
+    }
+
+    /// Each ad in a pod gets its own control, and its own chance to be wrong.
+    func resetSkipControlReport() {
+        reportedSkipControlProblem = false
+    }
+
+    /// Reported when the skip control is laid out, which is the only moment its
+    /// real size exists. Judged here rather than at unlock time: the control is
+    /// drawn after `canSkip` flips, so asking then would read a size that has not
+    /// happened yet.
+    func noteSkipControl(size: CGSize) {
+        surfacePresence.update(skipControlSize: size)
+        guard configuration.skipPresentation == .sdk,
+              let ad = currentAd, ad.isSkippable,
+              !reportedSkipControlProblem,
+              let diagnosis = surfacePresence.skipControlDiagnosis
+        else { return }
+        reportedSkipControlProblem = true
+        print("[VASTKit] skip control unavailable: \(diagnosis)")
+        delegate?.session(self, skipControlUnavailableFor: ad, reason: diagnosis)
+    }
+
+    /// §3.10.1 makes ClickThrough support Required, and the surface is how the
+    /// SDK provides it — except where a transparent sheet cannot be reached at
+    /// all. Saying so is the difference between a host choosing `.host` and a
+    /// host shipping an ad nobody can click.
+    func verifyClickPath(for ad: VASTAd) {
+        #if os(tvOS)
+        guard configuration.clickPresentation == .surface,
+              ad.linear.clickThrough != nil
+        else { return }
+        let reason = """
+        clickPresentation is .surface, but tvOS has no pointer and a transparent \
+        layer cannot take focus, so this ad has no click path. Set \
+        clickPresentation to .host and call click() from a focusable control of \
+        your own, or to .disabled to opt out knowingly.
+        """
+        print("[VASTKit] click path unavailable: \(reason)")
+        delegate?.session(self, clickThroughUnavailableFor: ad, reason: reason)
+        #endif
     }
 
     /// Checks the one compliance promise the SDK cannot verify on its own, at the

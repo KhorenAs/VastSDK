@@ -93,6 +93,7 @@ extension VASTAdSession {
 
     private func playOne(_ ad: VASTAd, using playback: VASTPlaybackController) async -> Outcome {
         currentAd = ad
+        resetSkipControlReport()
         canSkip = false
         timeUntilSkip = ad.linear.resolvedSkipOffset()
         // Seed the countdown from <Duration> so the overlay reads the creative's
@@ -138,6 +139,7 @@ extension VASTAdSession {
         }
 
         state = .playing
+        verifyClickPath(for: ad)
         delegate?.session(self, didStart: ad, at: adPosition)
 
         let clock = VASTPlayerClock(player: player, adItem: item)

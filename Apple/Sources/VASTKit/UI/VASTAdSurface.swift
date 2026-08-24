@@ -91,14 +91,22 @@ public struct VASTAdSurface: View {
     // MARK: - Click
 
     /// §3.10.1's model: the ad itself is what the viewer clicks.
+    ///
+    /// Not on tvOS. There is no pointer there and nothing focusable about a
+    /// transparent sheet, so this layer would be inert — and an inert click path
+    /// that looks present is worse than an absent one, because nobody finds out.
+    /// The session reports it instead; a tvOS host wires its own affordance under
+    /// `.host`, or opts out with `.disabled`.
     @ViewBuilder
     private var clickLayer: some View {
+        #if !os(tvOS)
         if session.configuration.clickPresentation == .surface,
            session.currentAd?.linear.clickThrough != nil {
             Color.clear
                 .contentShape(Rectangle())
                 .onTapGesture(perform: performClick)
         }
+        #endif
     }
 
     private func performClick() {
@@ -156,16 +164,24 @@ public struct VASTAdSurface: View {
 
     /// Drawn only when the SDK owns the control. Under `.host` the host draws it,
     /// and under `.unsupported` a skippable ad never reaches playback at all.
+    ///
+    /// A host-supplied control is wrapped in a `Button` rather than given a tap
+    /// gesture. A gesture is not focusable, so on tvOS — where there is no tap at
+    /// all — a custom skip control was unreachable while the built-in one worked,
+    /// which is exactly backwards. The `Button` also brings hit-testing and
+    /// accessibility that every host would otherwise have to remember.
     @ViewBuilder
     private var skip: some View {
         if session.configuration.skipPresentation == .sdk,
            session.currentAd?.isSkippable == true {
             if let skipButton {
-                skipButton(session.canSkip ? nil : session.timeUntilSkip)
-                    .onTapGesture { if session.canSkip { try? session.skip() } }
+                skipControl {
+                    skipButton(session.canSkip ? nil : session.timeUntilSkip)
+                }
             } else if session.canSkip {
                 Button("Skip Ad  ›") { try? session.skip() }
                     .buttonStyle(.borderedProminent)
+                    .measuredAsSkipControl(of: session)
             } else if let remaining = session.timeUntilSkip {
                 Text("Skip in \(Int(remaining.rounded(.up)))")
                     .padding(.horizontal, 12)
@@ -173,6 +189,43 @@ public struct VASTAdSurface: View {
                     .background(.black.opacity(0.6), in: Capsule())
             }
         }
+    }
+
+    @ViewBuilder
+    private func skipControl<V: View>(@ViewBuilder _ label: () -> V) -> some View {
+        let button = Button(action: { if session.canSkip { try? session.skip() } }, label: label)
+            .disabled(!session.canSkip)
+            .measuredAsSkipControl(of: session)
+
+        // tvOS keeps the platform button style: it is what draws the focus state,
+        // and a host's label rarely draws one itself. Elsewhere `.plain` leaves
+        // the host's look alone, which is the point of supplying one.
+        #if os(tvOS)
+        button
+        #else
+        button.buttonStyle(.plain)
+        #endif
+    }
+}
+
+// MARK: - Measurement
+
+private extension View {
+
+    /// Reports the drawn size of the skip control to the session.
+    ///
+    /// `SkipPresentation.sdk` promises the viewer a control, and a replaceable
+    /// one can be replaced with nothing: a builder returning `EmptyView` collapses
+    /// to zero and the promise is quietly broken. The surface probe cannot see
+    /// this — it measures the surface, which is still the full size of the player.
+    func measuredAsSkipControl(of session: VASTAdSession) -> some View {
+        background(
+            GeometryReader { proxy in
+                Color.clear
+                    .onAppear { session.noteSkipControl(size: proxy.size) }
+                    .onChange(of: proxy.size) { session.noteSkipControl(size: $0) }
+            }
+        )
     }
 }
 

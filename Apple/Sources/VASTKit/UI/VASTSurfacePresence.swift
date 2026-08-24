@@ -25,6 +25,9 @@ public struct VASTSurfacePresence: Sendable, Equatable {
 
     /// The size the surface last reported, or `nil` if it never has.
     public private(set) var reportedSize: CGSize?
+    /// The size of the skip control itself, once it has been drawn. Distinct from
+    /// the surface: a full-size surface can still carry a control of no size.
+    public private(set) var skipControlSize: CGSize?
 
     public var isUsable: Bool {
         guard let reportedSize else { return false }
@@ -32,8 +35,20 @@ public struct VASTSurfacePresence: Sendable, Equatable {
             && reportedSize.height >= Self.minimumUsableEdge
     }
 
+    /// `nil` while the control has not been drawn — which is not the same as too
+    /// small, and must not be reported as if it were.
+    public var skipControlIsUsable: Bool? {
+        guard let skipControlSize else { return nil }
+        return skipControlSize.width >= Self.minimumUsableEdge
+            && skipControlSize.height >= Self.minimumUsableEdge
+    }
+
     mutating func update(size: CGSize) {
         reportedSize = size
+    }
+
+    mutating func update(skipControlSize size: CGSize) {
+        skipControlSize = size
     }
 
     /// Why the surface cannot carry a control, in words a developer can act on.
@@ -50,6 +65,18 @@ public struct VASTSurfacePresence: Sendable, Equatable {
         VASTAdSurface is \(Int(reportedSize.width))×\(Int(reportedSize.height))pt, \
         too small to carry a skip control. Give it the player's bounds rather \
         than wrapping it in a sized container.
+        """
+    }
+
+    /// Why the control that *was* drawn cannot be used. Silent while it has not
+    /// been drawn yet: `diagnosis` already covers a surface that never appeared,
+    /// and guessing early is what produced a false alarm before.
+    var skipControlDiagnosis: String? {
+        guard let size = skipControlSize, skipControlIsUsable == false else { return nil }
+        return """
+        The skip control drew at \(Int(size.width))×\(Int(size.height))pt, too \
+        small for a viewer to hit. A vastSkipButton builder that returns an empty \
+        or unsized view leaves a skippable ad with no way to skip it.
         """
     }
 }

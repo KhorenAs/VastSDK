@@ -36,9 +36,14 @@ public protocol iVASTAdSessionDelegate: AnyObject {
     func sessionDidFinishAllAds(_ session: VASTAdSession)
 
     /// The SDK owns the skip control for this ad but cannot show it: the surface
-    /// is missing or too small. Occlusion by another view is not detectable, so
-    /// this catches what it can rather than everything.
+    /// is missing or too small, or the control itself drew at no usable size.
+    /// Occlusion by another view is not detectable, so this catches what it can
+    /// rather than everything.
     func session(_ session: VASTAdSession, skipControlUnavailableFor ad: VASTAd, reason: String)
+
+    /// The ad declares a ClickThrough that no viewer can reach — today, a tvOS
+    /// host left on `.surface`, where a transparent layer takes no focus.
+    func session(_ session: VASTAdSession, clickThroughUnavailableFor ad: VASTAd, reason: String)
 }
 
 public extension iVASTAdSessionDelegate {
@@ -54,4 +59,5 @@ public extension iVASTAdSessionDelegate {
     func session(_ session: VASTAdSession, didFail error: VASTError, for ad: VASTAd?) {}
     func sessionDidFinishAllAds(_ session: VASTAdSession) {}
     func session(_ session: VASTAdSession, skipControlUnavailableFor ad: VASTAd, reason: String) {}
+    func session(_ session: VASTAdSession, clickThroughUnavailableFor ad: VASTAd, reason: String) {}
 }

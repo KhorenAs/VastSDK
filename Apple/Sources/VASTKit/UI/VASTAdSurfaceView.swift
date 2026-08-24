@@ -31,6 +31,11 @@ public final class VASTAdSurfaceView: PlatformView {
         didSet { rebuild() }
     }
 
+    /// Replaces the countdown. The argument is the time left in the creative.
+    public var countdownBuilder: ((TimeInterval) -> PlatformView)? {
+        didSet { rebuild() }
+    }
+
     /// Handle the click destination yourself instead of letting the SDK open it.
     public var clickThroughHandler: ((URL) -> Void)? {
         didSet { rebuild() }
@@ -65,6 +70,11 @@ public final class VASTAdSurfaceView: PlatformView {
         if let adBadgeBuilder {
             surface = surface.vastAdBadge { position in
                 PlatformViewRepresentable(view: adBadgeBuilder(position))
+            }
+        }
+        if let countdownBuilder {
+            surface = surface.vastCountdown { remaining in
+                PlatformViewRepresentable(view: countdownBuilder(remaining))
             }
         }
         if let clickThroughHandler {

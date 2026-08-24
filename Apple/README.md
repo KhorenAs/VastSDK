@@ -10,7 +10,7 @@ Sources/
   Harness/    runnable logic harness: `swift run Harness`
 Examples/
   VASTDemo.xcodeproj    SwiftUIDemo · UIKitDemo · AppKitDemo
-Tests/        136 tests
+Tests/        139 tests
 Reference/    IAB VAST 4.0/4.1/4.2 XSD schemas
 ```
 
@@ -40,7 +40,15 @@ session.attach(to: playerOverlayView)
 
 Every element of the surface is replaceable — `vastSkipButton`, `vastAdBadge`,
 `vastCountdown`, `vastClickThrough` — so the SDK owns the *behaviour* the spec
-requires while the host owns the look.
+requires while the host owns the look. A replaced skip control is still wrapped
+in a `Button`, so it stays focusable and hittable on every platform, and its
+drawn size is checked: a builder that returns nothing is reported rather than
+silently leaving a skippable ad unskippable.
+
+On tvOS there is no pointer, so `clickPresentation = .surface` cannot work — a
+transparent layer takes no focus. The session says so through the delegate
+instead of drawing something inert; a tvOS host uses `.host` with a focusable
+control of its own, or `.disabled`.
 
 ## What it covers
 
@@ -109,7 +117,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 136 tests
+swift test                  # 139 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 
