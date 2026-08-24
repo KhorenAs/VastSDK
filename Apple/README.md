@@ -10,7 +10,7 @@ Sources/
   Harness/    runnable logic harness: `swift run Harness`
 Examples/
   VASTDemo.xcodeproj    SwiftUIDemo · UIKitDemo · AppKitDemo
-Tests/        139 tests
+Tests/        148 tests
 Reference/    IAB VAST 4.0/4.1/4.2 XSD schemas
 ```
 
@@ -63,7 +63,7 @@ control of its own, or `.disabled`.
 | §6 macros (`[ERRORCODE]`, `[ADPLAYHEAD]`, `[CACHEBUSTING]`, …) | ✅ |
 | `<Extensions>` handed to the host raw | ✅ |
 | `<AdVerifications>` parsed and handed over — VAST 3 and 4 shapes | ✅ |
-| Executing verification code (OM SDK) | ❌ by decision |
+| Executing verification code (OM SDK) | ❌ by decision — `iVASTAdMeasurement` is the seam |
 | NonLinear · Companion · VPAID · SIMID · Icons | ❌ by decision |
 | VMAP (ad-break scheduling) | ❌ not yet |
 
@@ -72,7 +72,7 @@ response. A response whose *only* creative is one of these is a different case:
 the slot was filled, so the server hears VAST error 201 ("expecting different
 linearity") on its own `<Error>` URI rather than being told it returned nothing.
 
-## Three decisions worth knowing
+## Four decisions worth knowing
 
 **Compliance is enforced, not hoped for.** `SkipPresentation` says who provides
 the skip control. Under `.unsupported`, a skippable ad is refused with VAST error
@@ -84,8 +84,23 @@ including the VAST 3 shape, where vendors shipped it inside
 `<Extension type="AdVerifications">` — and normalised into `ad.adVerifications`,
 so a host cannot tell which version answered. Running that code means the IAB
 Open Measurement SDK, which is licensed separately and stays outside this
-package. What the SDK keeps is enough to hand a measurement layer its resources,
-and enough to report honestly on `verificationNotExecuted` when nothing runs them.
+package. `iVASTAdMeasurement` is the seam:
+
+```swift
+session.measurement = MyOpenMeasurementAdapter()
+```
+
+With nothing set, every vendor that asked is sent `verificationNotExecuted` —
+reason 1 where no OMID resource exists, reason 3 where one does and nothing ran
+it. With an adapter set the SDK goes quiet, drives the adapter from the same
+beacons the ad server receives, and takes `resourceLoadError` back through
+`reportVerificationNotExecuted(_:reason:)`, which only the loader can know.
+
+**`.host` transfers the obligation, and nothing checks it.** Under
+`skipPresentation = .host` or `clickPresentation = .host` the SDK draws no
+control and makes no claim about whether you drew one. It cannot: it does not
+know your view tree. That mode is a statement that §2.3 and §3.10.1 are yours to
+honour — the SDK's own promises hold only for `.sdk` and `.surface`.
 
 **The correctness-critical logic never touches AVPlayer.** `VASTCore` cannot
 import AVFoundation — the compiler enforces it. Time arrives as `VASTTick`
@@ -117,7 +132,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 139 tests
+swift test                  # 148 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 

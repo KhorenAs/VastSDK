@@ -36,6 +36,19 @@ public final class VASTAdSession: ObservableObject {
 
     public weak var delegate: (any iVASTAdSessionDelegate)?
 
+    /// Third-party measurement, if anything is going to execute the ad's
+    /// `<AdVerifications>`. Set it before `play()`.
+    ///
+    /// Held strongly, unlike `delegate`: a measurement integration is usually
+    /// created for the session and holds the vendor session state, and a weak
+    /// reference there fails by silently measuring nothing — the one failure a
+    /// measurement layer must not have.
+    ///
+    /// Leaving this `nil` is not a gap: the SDK then reports
+    /// `verificationNotExecuted` to every vendor that asked, which is the honest
+    /// answer and the whole reason the field is optional.
+    public var measurement: (any iVASTAdMeasurement)?
+
     let player: AVPlayer
     /// Read by the ad surface, which has to know who owns the skip control and
     /// whether the creative is clickable.
@@ -80,7 +93,10 @@ public final class VASTAdSession: ObservableObject {
     /// handle here closes a cycle that keeps the session, its `AVPlayer` and the
     /// decoded creative alive for the rest of the process. All this reference is
     /// for is being able to remove the view again.
-    private weak var attachedSurface: VASTAdSurfaceView?
+    /// The surface pinned by `attach(to:)`, when the host took that route.
+    /// Measurement needs a view to measure, and this is the only one the SDK is
+    /// ever handed.
+    weak var attachedSurface: VASTAdSurfaceView?
 
     /// What is known about the ad surface being on screen. Reported by the
     /// surface itself; see `VASTSurfacePresence` for what it can and cannot see.
@@ -91,6 +107,22 @@ public final class VASTAdSession: ObservableObject {
 
     func noteSurface(size: CGSize) {
         surfacePresence.update(size: size)
+    }
+
+    /// Reports a vendor's resource as having failed to load.
+    ///
+    /// Only the measurement layer can know this — the SDK never fetches a
+    /// verification resource — so `resourceLoadError` reaches the vendor through
+    /// here or not at all. Firing it is additive: the SDK stayed silent about
+    /// this ad precisely because measurement was configured.
+    public func reportVerificationNotExecuted(
+        _ verification: VASTAd.Verification,
+        reason: VASTAd.Verification.NotExecutedReason = .resourceLoadError
+    ) {
+        guard let ad = currentAd else { return }
+        send(verification.notExecutedTrackers.map {
+            VASTBeacon(kind: .verificationNotExecuted(reason), url: $0, adID: ad.id)
+        })
     }
 
     /// Each ad in a pod gets its own control, and its own chance to be wrong.

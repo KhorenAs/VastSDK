@@ -337,4 +337,37 @@ final class VASTAdVerificationsTests: XCTestCase {
         let expanded = VASTMacroExpander().expand(url, with: .init())
         XCTAssertEqual(expanded.absoluteString, "https://ads.test/e?r=-1")
     }
+
+    /// §6 defines this as the vendors named in the response. Until the response
+    /// was parsed for them it could only be answered "unknown".
+    func testVerificationVendorsMacroListsTheVendors() {
+        let url = URL(string: "https://ads.test/t?v=%5BVERIFICATIONVENDORS%5D")!
+        let expanded = VASTMacroExpander().expand(
+            url,
+            with: .init(verificationVendors: ["one.com-omid", "two.com"])
+        )
+        XCTAssertEqual(expanded.absoluteString, "https://ads.test/t?v=one.com-omid%2Ctwo.com")
+    }
+
+    /// Nobody asked for verification, which is not the same as refusing to say.
+    func testVerificationVendorsMacroIsUnknownWhenNoneWereNamed() {
+        let url = URL(string: "https://ads.test/t?v=%5BVERIFICATIONVENDORS%5D")!
+        XCTAssertEqual(
+            VASTMacroExpander().expand(url, with: .init()).absoluteString,
+            "https://ads.test/t?v=-1"
+        )
+    }
+
+    /// Only a measurement integration has a partner identity to report.
+    func testOmidPartnerMacro() {
+        let url = URL(string: "https://ads.test/t?p=%5BOMIDPARTNER%5D")!
+        XCTAssertEqual(
+            VASTMacroExpander().expand(url, with: .init(omidPartner: "Kinodaran/1.0")).absoluteString,
+            "https://ads.test/t?p=Kinodaran%2F1.0"
+        )
+        XCTAssertEqual(
+            VASTMacroExpander().expand(url, with: .init()).absoluteString,
+            "https://ads.test/t?p=-1"
+        )
+    }
 }

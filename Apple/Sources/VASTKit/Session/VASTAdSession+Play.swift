@@ -102,7 +102,10 @@ extension VASTAdSession {
         state = .loading
         lastTick = nil
 
-        var engine = VASTTrackingEngine(ad: ad)
+        // The engine reports verificationNotExecuted unless told something will
+        // run the vendors' code. It cannot see the measurement layer itself, so
+        // the answer is passed in.
+        var engine = VASTTrackingEngine(ad: ad, measurementWillRun: measurement != nil)
 
         // §2.3: "nor should the media player play the Skippable Ad as a Linear
         // Ad (without skip controls)". A host that cannot offer the control is
@@ -140,6 +143,9 @@ extension VASTAdSession {
 
         state = .playing
         verifyClickPath(for: ad)
+        // Before the impression: a measurement session has to exist for the
+        // impression it is being asked to attest to.
+        measurement?.begin(VASTMeasurementContext(ad: ad, adView: attachedSurface))
         delegate?.session(self, didStart: ad, at: adPosition)
 
         let clock = VASTPlayerClock(player: player, adItem: item)
@@ -211,6 +217,9 @@ extension VASTAdSession {
 
         let outcome: Outcome = outcomeFor(engine)
         skipRequested = false
+        // Exactly once per `begin`, whatever the outcome: a measurement session
+        // left open counts against the vendor, not against us.
+        measurement?.finish()
         delegate?.session(self, didFinish: ad, outcome: outcome)
         return outcome
     }
@@ -247,16 +256,67 @@ extension VASTAdSession {
     /// as the literal text `[ERRORCODE]`.
     func send(_ beacons: [VASTBeacon]) {
         guard !beacons.isEmpty else { return }
+        notifyMeasurement(of: beacons)
         let expanded = beacons.map(expandMacros)
         let transport = transport
         Task.detached { await transport.fire(expanded) }
+    }
+
+    /// Measurement is driven from the beacons rather than from separate call
+    /// sites, so what a vendor observes is the same sequence, in the same order,
+    /// that the ad server is told about. Two sources of truth here would drift,
+    /// and the discrepancy would land in someone's viewability report.
+    private func notifyMeasurement(of beacons: [VASTBeacon]) {
+        guard let measurement else { return }
+        var last: VASTMeasurementEvent?
+        for beacon in beacons {
+            guard let event = Self.measurementEvent(for: beacon.kind, isMuted: lastTick?.isMuted ?? false, duration: activeEngine?.duration ?? 0) else { continue }
+            // One `<Impression>` element per vendor is normal; one impression is
+            // what happened.
+            if event == last { continue }
+            last = event
+            measurement.record(event)
+        }
+    }
+
+    private static func measurementEvent(
+        for kind: VASTBeacon.Kind,
+        isMuted: Bool,
+        duration: TimeInterval
+    ) -> VASTMeasurementEvent? {
+        switch kind {
+        case .impression:
+            return .impression
+        case .progress(let offset):
+            return .progress(offset)
+        case .clickTracking:
+            return .clicked
+        case .error(let error):
+            return .failed(error)
+        case .verificationNotExecuted:
+            // Only fired when nothing is measuring, so nobody is listening.
+            return nil
+        case .tracking(let event):
+            switch event {
+            case .start: return .start(duration: duration, isMuted: isMuted)
+            case .firstQuartile, .midpoint, .thirdQuartile, .complete: return .quartile(event)
+            case .pause: return .pause
+            case .resume: return .resume
+            case .skip: return .skipped
+            default: return nil
+            }
+        }
     }
 
     private func expandMacros(_ beacon: VASTBeacon) -> VASTBeacon {
         var context = VASTMacroExpander.Context(
             adPlayhead: lastTick?.adTime,
             assetURI: currentMediaFile?.url,
-            isMuted: lastTick?.isMuted
+            isMuted: lastTick?.isMuted,
+            // Answerable now that <AdVerifications> is parsed: before, this went
+            // out as "unknown" even when the response named its vendors.
+            verificationVendors: currentAd?.adVerifications.compactMap(\.vendor) ?? [],
+            omidPartner: measurement?.omidPartner
         )
         // Only an error beacon carries a code, and it is the code for *this*
         // failure — not the last one the session happened to see. `[REASON]`

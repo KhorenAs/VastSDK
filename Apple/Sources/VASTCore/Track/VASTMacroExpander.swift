@@ -42,6 +42,13 @@ public struct VASTMacroExpander: Sendable {
         public var isMuted: Bool?
         public var isFullscreen: Bool?
         public var appBundle: String?
+        /// Vendors named in the ad's `<AdVerifications>`. Reported as unknown
+        /// while empty, which is the difference between "nobody asked" and
+        /// "somebody asked and we are not saying".
+        public var verificationVendors: [String]
+        /// The OMID partner name and version, when a measurement integration is
+        /// present to have one.
+        public var omidPartner: String?
         /// Vendor macros this SDK knows nothing about, supplied by the host.
         public var custom: [String: String]
 
@@ -57,6 +64,8 @@ public struct VASTMacroExpander: Sendable {
             isMuted: Bool? = nil,
             isFullscreen: Bool? = nil,
             appBundle: String? = nil,
+            verificationVendors: [String] = [],
+            omidPartner: String? = nil,
             custom: [String: String] = [:]
         ) {
             self.errorCode = errorCode
@@ -70,6 +79,8 @@ public struct VASTMacroExpander: Sendable {
             self.isMuted = isMuted
             self.isFullscreen = isFullscreen
             self.appBundle = appBundle
+            self.verificationVendors = verificationVendors
+            self.omidPartner = omidPartner
             self.custom = custom
         }
     }
@@ -173,6 +184,13 @@ public struct VASTMacroExpander: Sendable {
 
         case "REASON":
             return context.verificationNotExecutedReason.map { String($0.rawValue) } ?? Self.unknownValue
+
+        case "VERIFICATIONVENDORS":
+            guard !context.verificationVendors.isEmpty else { return Self.unknownValue }
+            return Self.encode(context.verificationVendors.joined(separator: ","))
+
+        case "OMIDPARTNER":
+            return context.omidPartner.map(Self.encode) ?? Self.unknownValue
 
         case "ADPLAYHEAD", "MEDIAPLAYHEAD":
             // MEDIAPLAYHEAD is the pre-4.1 spelling of the same value.
