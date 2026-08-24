@@ -1,0 +1,121 @@
+# VASTSDK — Apple
+
+A native VAST 4.3 linear-video ad SDK for iOS, tvOS and macOS. No Google IMA, no
+VPAID, no WebView.
+
+```
+Sources/
+  VASTCore/   pure logic — does not import AVFoundation or SwiftUI
+  VASTKit/    player + UI binding
+  Harness/    runnable logic harness: `swift run Harness`
+Examples/
+  VASTDemo.xcodeproj    SwiftUIDemo · UIKitDemo · AppKitDemo
+Tests/        111 tests
+Reference/    IAB VAST 4.0/4.1/4.2 XSD schemas
+```
+
+## Using it
+
+```swift
+let session = VASTAdSession(player: myPlayer)
+
+try await session.load(tag: adTagURL)   // follows Wrapper chains
+await session.play()                    // plays the pod, reports tracking
+```
+
+SwiftUI hosts compose the ad UI over their player:
+
+```swift
+ZStack {
+    MyPlayerView(player: player)
+    VASTAdSurface(session: session)
+}
+```
+
+UIKit and AppKit hosts hand the SDK a container instead:
+
+```swift
+session.attach(to: playerOverlayView)
+```
+
+Every element of the surface is replaceable — `vastSkipButton`, `vastAdBadge`,
+`vastCountdown`, `vastClickThrough` — so the SDK owns the *behaviour* the spec
+requires while the host owns the look.
+
+## What it covers
+
+| | |
+|---|---|
+| Linear ads | ✅ |
+| Skippable Linear (`skipoffset`) | ✅ |
+| Ad Pods (`sequence`) + stand-alone substitution | ✅ |
+| Wrapper chains (depth ≤ 5, tracker accumulation, error fan-out) | ✅ |
+| Tracking: impression, quartiles, progress offsets, skip, click, error | ✅ |
+| VAST 2.0/3.0 legacy event names | ✅ |
+| §6 macros (`[ERRORCODE]`, `[ADPLAYHEAD]`, `[CACHEBUSTING]`, …) | ✅ |
+| `<Extensions>` handed to the host raw | ✅ |
+| NonLinear · Companion · VPAID · SIMID · OMID · Icons | ❌ by decision |
+| VMAP (ad-break scheduling) | ❌ not yet |
+
+Ignored elements are skipped, not rejected — an unknown element never fails a
+response.
+
+## Two decisions worth knowing
+
+**Compliance is enforced, not hoped for.** `SkipPresentation` says who provides
+the skip control. Under `.unsupported`, a skippable ad is refused with VAST error
+200 rather than played without one, because §2.3 forbids exactly that. The
+default is `.sdk`, so a host that configures nothing is compliant.
+
+**The correctness-critical logic never touches AVPlayer.** `VASTCore` cannot
+import AVFoundation — the compiler enforces it. Time arrives as `VASTTick`
+values, and the tracking engine returns beacons instead of sending them. That is
+why quartile behaviour, seek rejection, pod substitution and wrapper limits are
+all testable with no player, no network and no waiting.
+
+## Things that are easy to get wrong
+
+Each of these is a bug that was found and is now pinned by a test.
+
+- **Quartiles measure covered timeline, not accumulated deltas.** A stall does not
+  skip any of the creative; a seek does. Summing playback deltas discounts stalls,
+  so on a stuttering connection `complete` never fires and the ad hangs.
+- **Tracking is never awaited from the playback loop.** One unreachable tracking
+  host froze the countdown, the skip control and the end of the ad.
+- **`AVPlayerItem.status` is polled, not observed.** If the item settles before an
+  async `publisher(for:).values` sequence is subscribed, the transition is never
+  delivered and the break stops with the creative never appearing.
+- **`try? await Task.sleep` swallows cancellation.** A dismissed screen carried on
+  into the break — audible, with nothing left to stop it.
+- **`URL(string:)` percent-encodes brackets**, so `[ERRORCODE]` arrives as
+  `%5BERRORCODE%5D`; and a leftover vendor macro makes Foundation re-encode the
+  whole string, double-encoding values that were already correct.
+- **iOS never resumes playback after backgrounding.** `rate` is left at 0, and a
+  stall watchdog that keys on `rate > 0` cannot tell that apart from a hang.
+
+## Running things
+
+```bash
+swift build                 # VASTCore + VASTKit
+swift test                  # 111 tests
+swift run Harness           # tracking engine + parser against fixtures
+```
+
+```bash
+open Examples/VASTDemo.xcodeproj
+```
+
+Then pick a scheme — SwiftUIDemo, UIKitDemo, AppKitDemo — and a destination.
+The demo's scenario list covers two live tags from Google's public IMA sample
+inventory, skippable and non-skippable responses, a three-ad pod, a no-fill
+response and an unplayable creative. The list footer shows live player-screen
+count; it must read zero once no player screen is open.
+
+## Requirements
+
+iOS 16 · tvOS 16 · macOS 13 · Swift 6 (strict concurrency)
+
+`Reference/` holds the IAB XSD schemas. Test fixtures under
+`Tests/VASTCoreTests/Fixtures/` come from the IAB sample tags shipped with
+[dailymotion/vast-client-js](https://github.com/dailymotion/vast-client-js) (MIT),
+used because they carry the inconsistencies real ad servers produce.

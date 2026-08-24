@@ -1,0 +1,406 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 60;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		AA000000000000000000001D /* AdBreakView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA0000000000000000000009; };
+		AA000000000000000000001E /* SwiftUIDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000A; };
+		AA000000000000000000001C /* VASTKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA000000000000000000001B; };
+		AA000000000000000000002A /* AdBreakViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000B; };
+		AA000000000000000000002B /* UIKitDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000C; };
+		AA0000000000000000000029 /* VASTKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000028; };
+		AA0000000000000000000037 /* AdBreakWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000D; };
+		AA0000000000000000000038 /* AppKitDemoApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA000000000000000000000E; };
+		AA0000000000000000000036 /* VASTKit in Frameworks */ = {isa = PBXBuildFile; productRef = AA0000000000000000000035; };
+		BB0000000000000000000002 /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001; };
+		BB0000000000000000000003 /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001; };
+		BB0000000000000000000004 /* DemoCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000001; };
+		BB0000000000000000000006 /* ScenarioListViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0000000000000000000005; };
+		CC0000000000000000000065 /* PlayerLayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000064; };
+		CC0000000000000000000066 /* PlayerLayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000064; };
+		CC0000000000000000000067 /* PlayerLayerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000064; };
+		CC0000000000000000000069 /* ContentPlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000068; };
+		CC000000000000000000006A /* ContentPlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000068; };
+		CC000000000000000000006B /* ContentPlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000068; };
+		CC000000000000000000006D /* PlayerControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000006C; };
+		DD0000000000000000000002 /* ClickThrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000001; };
+		DD0000000000000000000003 /* ClickThrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000001; };
+		DD0000000000000000000004 /* ClickThrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000001; };
+		EE0000000000000000000002 /* AdBreakScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000001; };
+		EE0000000000000000000003 /* AdBreakScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000001; };
+		EE0000000000000000000004 /* AdBreakScreen.swift in Sources */ = {isa = PBXBuildFile; fileRef = EE0000000000000000000001; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		AA0000000000000000000009 /* AdBreakView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBreakView.swift; sourceTree = "<group>"; };
+		AA000000000000000000000A /* SwiftUIDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwiftUIDemoApp.swift; sourceTree = "<group>"; };
+		AA000000000000000000000B /* AdBreakViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBreakViewController.swift; sourceTree = "<group>"; };
+		AA000000000000000000000C /* UIKitDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UIKitDemoApp.swift; sourceTree = "<group>"; };
+		AA000000000000000000000D /* AdBreakWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBreakWindowController.swift; sourceTree = "<group>"; };
+		AA000000000000000000000E /* AppKitDemoApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppKitDemoApp.swift; sourceTree = "<group>"; };
+		AA0000000000000000000014 /* SwiftUIDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SwiftUIDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA0000000000000000000021 /* UIKitDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = UIKitDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA000000000000000000002E /* AppKitDemo.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = AppKitDemo.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BB0000000000000000000001 /* DemoCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoCatalog.swift; sourceTree = "<group>"; };
+		BB0000000000000000000005 /* ScenarioListViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioListViewController.swift; sourceTree = "<group>"; };
+		CC0000000000000000000064 /* PlayerLayerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerLayerView.swift; sourceTree = "<group>"; };
+		CC0000000000000000000068 /* ContentPlayerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentPlayerModel.swift; sourceTree = "<group>"; };
+		CC000000000000000000006C /* PlayerControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControls.swift; sourceTree = "<group>"; };
+		DD0000000000000000000001 /* ClickThrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickThrough.swift; sourceTree = "<group>"; };
+		EE0000000000000000000001 /* AdBreakScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBreakScreen.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		AA0000000000000000000016 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (
+				AA000000000000000000001C,
+			); runOnlyForDeploymentPostprocessing = 0; };
+		AA0000000000000000000023 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (
+				AA0000000000000000000029,
+			); runOnlyForDeploymentPostprocessing = 0; };
+		AA0000000000000000000030 = {isa = PBXFrameworksBuildPhase; buildActionMask = 2147483647; files = (
+				AA0000000000000000000036,
+			); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		AA0000000000000000000003 = {isa = PBXGroup; children = (
+				AA000000000000000000000F,
+				AA0000000000000000000010,
+				AA0000000000000000000011,
+				AA0000000000000000000012,
+				AA0000000000000000000004,
+			); sourceTree = "<group>"; };
+		AA0000000000000000000004 /* Products */ = {isa = PBXGroup; children = (
+				AA0000000000000000000014,
+				AA0000000000000000000021,
+				AA000000000000000000002E,
+			); name = Products; sourceTree = "<group>"; };
+		AA000000000000000000000F /* Shared */ = {isa = PBXGroup; children = (
+				EE0000000000000000000001,
+				DD0000000000000000000001,
+				CC0000000000000000000064,
+				CC0000000000000000000068,
+				BB0000000000000000000001,
+			); path = Shared; sourceTree = "<group>"; };
+		AA0000000000000000000010 /* SwiftUIDemo */ = {isa = PBXGroup; children = (
+				CC000000000000000000006C,
+				AA0000000000000000000009,
+				AA000000000000000000000A,
+			); path = SwiftUIDemo; sourceTree = "<group>"; };
+		AA0000000000000000000011 /* UIKitDemo */ = {isa = PBXGroup; children = (
+				BB0000000000000000000005,
+				AA000000000000000000000B,
+				AA000000000000000000000C,
+			); path = UIKitDemo; sourceTree = "<group>"; };
+		AA0000000000000000000012 /* AppKitDemo */ = {isa = PBXGroup; children = (
+				AA000000000000000000000D,
+				AA000000000000000000000E,
+			); path = AppKitDemo; sourceTree = "<group>"; };
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		AA0000000000000000000013 /* SwiftUIDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000018;
+			buildPhases = (
+				AA0000000000000000000015,
+				AA0000000000000000000016,
+				AA0000000000000000000017,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = SwiftUIDemo;
+			packageProductDependencies = (
+				AA000000000000000000001B,
+			);
+			productName = SwiftUIDemo;
+			productReference = AA0000000000000000000014;
+			productType = "com.apple.product-type.application";
+		};
+		AA0000000000000000000020 /* UIKitDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000025;
+			buildPhases = (
+				AA0000000000000000000022,
+				AA0000000000000000000023,
+				AA0000000000000000000024,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = UIKitDemo;
+			packageProductDependencies = (
+				AA0000000000000000000028,
+			);
+			productName = UIKitDemo;
+			productReference = AA0000000000000000000021;
+			productType = "com.apple.product-type.application";
+		};
+		AA000000000000000000002D /* AppKitDemo */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = AA0000000000000000000032;
+			buildPhases = (
+				AA000000000000000000002F,
+				AA0000000000000000000030,
+				AA0000000000000000000031,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = AppKitDemo;
+			packageProductDependencies = (
+				AA0000000000000000000035,
+			);
+			productName = AppKitDemo;
+			productReference = AA000000000000000000002E;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		AA0000000000000000000002 = {
+			isa = PBXProject;
+			attributes = { BuildIndependentTargetsInParallel = 1; LastSwiftUpdateCheck = 2660; LastUpgradeCheck = 2660; };
+			buildConfigurationList = AA0000000000000000000005;
+			compatibilityVersion = "Xcode 15.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = ( en, Base );
+			mainGroup = AA0000000000000000000003;
+			packageReferences = (
+				AA0000000000000000000001,
+			);
+			productRefGroup = AA0000000000000000000004;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				AA0000000000000000000013,
+				AA0000000000000000000020,
+				AA000000000000000000002D,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		AA0000000000000000000017 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		AA0000000000000000000024 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+		AA0000000000000000000031 = {isa = PBXResourcesBuildPhase; buildActionMask = 2147483647; files = (); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		AA0000000000000000000015 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				EE0000000000000000000002,
+				DD0000000000000000000002,
+				CC0000000000000000000065,
+				CC0000000000000000000069,
+				CC000000000000000000006D,
+				BB0000000000000000000002,
+				AA000000000000000000001D,
+				AA000000000000000000001E,
+			); runOnlyForDeploymentPostprocessing = 0; };
+		AA0000000000000000000022 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				EE0000000000000000000003,
+				DD0000000000000000000003,
+				CC0000000000000000000066,
+				CC000000000000000000006A,
+				BB0000000000000000000003,
+				BB0000000000000000000006,
+				AA000000000000000000002A,
+				AA000000000000000000002B,
+			); runOnlyForDeploymentPostprocessing = 0; };
+		AA000000000000000000002F = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				EE0000000000000000000004,
+				DD0000000000000000000004,
+				CC0000000000000000000067,
+				CC000000000000000000006B,
+				BB0000000000000000000004,
+				AA0000000000000000000037,
+				AA0000000000000000000038,
+			); runOnlyForDeploymentPostprocessing = 0; };
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		AA0000000000000000000006 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				TVOS_DEPLOYMENT_TARGET = 16.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = auto;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000007 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				COPY_PHASE_STRIP = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_NO_COMMON_BLOCKS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.0;
+				MACOSX_DEPLOYMENT_TARGET = 13.0;
+				TVOS_DEPLOYMENT_TARGET = 16.0;
+				ONLY_ACTIVE_ARCH = NO;
+				SDKROOT = auto;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+		AA0000000000000000000019 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.swiftuidemo";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx appletvos appletvsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2,3";
+			};
+			name = Debug;
+		};
+		AA000000000000000000001A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.swiftuidemo";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx appletvos appletvsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2,3";
+			};
+			name = Release;
+		};
+		AA0000000000000000000026 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.uikitdemo";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator appletvos appletvsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2,3";
+			};
+			name = Debug;
+		};
+		AA0000000000000000000027 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.uikitdemo";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator appletvos appletvsimulator";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = "1,2,3";
+			};
+			name = Release;
+		};
+		AA0000000000000000000033 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.appkitdemo";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		AA0000000000000000000034 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_NSPrincipalClass = NSApplication;
+				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.appkitdemo";
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTED_PLATFORMS = "macosx";
+				SUPPORTS_MACCATALYST = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		AA0000000000000000000005 = {isa = XCConfigurationList; buildConfigurations = (
+				AA0000000000000000000006,
+				AA0000000000000000000007,
+			); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AA0000000000000000000018 = {isa = XCConfigurationList; buildConfigurations = (
+				AA0000000000000000000019,
+				AA000000000000000000001A,
+			); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AA0000000000000000000025 = {isa = XCConfigurationList; buildConfigurations = (
+				AA0000000000000000000026,
+				AA0000000000000000000027,
+			); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+		AA0000000000000000000032 = {isa = XCConfigurationList; buildConfigurations = (
+				AA0000000000000000000033,
+				AA0000000000000000000034,
+			); defaultConfigurationIsVisible = 0; defaultConfigurationName = Release; };
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		AA0000000000000000000001 = {isa = XCLocalSwiftPackageReference; relativePath = ".."; };
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		AA000000000000000000001B /* VASTKit */ = {isa = XCSwiftPackageProductDependency; productName = VASTKit; };
+		AA0000000000000000000028 /* VASTKit */ = {isa = XCSwiftPackageProductDependency; productName = VASTKit; };
+		AA0000000000000000000035 /* VASTKit */ = {isa = XCSwiftPackageProductDependency; productName = VASTKit; };
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = AA0000000000000000000002;
+}

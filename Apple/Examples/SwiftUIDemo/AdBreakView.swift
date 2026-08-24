@@ -1,0 +1,188 @@
+//
+//  AdBreakView.swift
+//  SwiftUIDemo
+//
+
+import SwiftUI
+import VASTCore
+import VASTKit
+
+/// First screen: pick a scenario.
+struct ScenarioListView: View {
+
+    @ObservedObject private var liveCount = AdBreakScreen.LiveCount.shared
+
+    var body: some View {
+        NavigationStack {
+            List(DemoCatalog.scenarios) { scenario in
+                NavigationLink(value: scenario) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(scenario.title).font(.headline)
+                        Text(scenario.detail)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("VAST Demo")
+            .navigationDestination(for: DemoScenario.self) { scenario in
+                PlayerView(scenario: scenario)
+            }
+            .safeAreaInset(edge: .bottom) { liveScreenCount }
+        }
+    }
+
+    /// Reads zero when no player screen is open. A number that stays above zero
+    /// after backing out means a screen — and its player — is still alive, which
+    /// is a far more useful thing to look at than guessing about a sound.
+    private var liveScreenCount: some View {
+        Text("live player screens: \(liveCount.value)")
+            .font(.caption2.monospaced())
+            .foregroundStyle(liveCount.value == 0 ? Color.secondary : Color.red)
+            .padding(8)
+    }
+}
+
+/// Second screen: content plays under the app's own controls, an ad break takes
+/// the player over, and the content resumes where it was interrupted.
+struct PlayerView: View {
+
+    @StateObject private var screen: AdBreakScreen
+
+    /// Nothing is built here. Everything the screen owns is created once, inside
+    /// the `StateObject`, because SwiftUI re-runs a view's `init` on every redraw
+    /// — and an `AVPlayer` built there is a new player each time.
+    init(scenario: DemoScenario) {
+        _screen = StateObject(wrappedValue: AdBreakScreen(scenario: scenario))
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            header
+
+            ZStack {
+                PlayerLayerView(player: screen.player)
+                    .aspectRatio(16 / 9, contentMode: .fit)
+                VASTAdSurface(session: screen.session)
+                    .vastSkipButton { remaining in
+                        DemoSkipButton(secondsUntilUnlock: remaining)
+                    }
+                    .vastClickThrough { url in
+                        screen.note(ClickThrough.open(url))
+                    }
+            }
+            .background(.black)
+
+            // The content transport disappears for the duration of the break:
+            // seeking inside a linear creative is not a thing VAST supports.
+            if screen.isPlayingAd {
+                Text("Content controls are unavailable during an ad")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .frame(height: 62)
+            } else {
+                ContentControls(model: screen.content)
+            }
+
+            Divider()
+            actions
+            eventLog
+        }
+        .navigationTitle(screen.scenario.title)
+        #if os(iOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
+        .task { await screen.start() }
+        .onDisappear { screen.invalidate() }
+    }
+
+    /// The scenario's own title, drawn in the page rather than left to the
+    /// navigation bar: over a letterboxed black video the bar is invisible, and
+    /// with six scenarios that look alike on screen, knowing which one is running
+    /// is the whole point of the detail page.
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            Text(screen.scenario.title)
+                .font(.headline)
+            Text(sourceLabel)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .truncationMode(.middle)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal)
+        .padding(.bottom, 8)
+    }
+
+    private var sourceLabel: String {
+        switch screen.scenario.source {
+        case .tag(let url): "tag · \(url.host ?? url.absoluteString)"
+        case .xml: "local response"
+        }
+    }
+
+    private var actions: some View {
+        HStack {
+            breakButton
+            Spacer()
+            Text(stateLabel).font(.caption).foregroundStyle(.secondary)
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 8)
+    }
+
+    /// One button, four meanings — because a label that stays "Replay" while
+    /// nothing has played yet, and stays tappable while a response is still
+    /// loading, is describing a state the session is not in.
+    @ViewBuilder
+    private var breakButton: some View {
+        switch screen.session.state {
+        case .loading:
+            Button("Loading…") {}
+                .disabled(true)
+
+        case .playing, .paused:
+            // Deliberately an action rather than a gap: this is the teardown path
+            // that used to leave an abandoned ad still audible.
+            Button("Stop ad break", role: .destructive) { screen.session.stop() }
+
+        case .idle, .finished:
+            Button(screen.hasPlayedOnce ? "Replay ad break" : "Play ad break") {
+                Task { await screen.runBreak() }
+            }
+            .disabled(screen.isBusy)
+        }
+    }
+
+    private var eventLog: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(alignment: .leading, spacing: 2) {
+                    ForEach(Array(screen.log.enumerated()), id: \.offset) { index, line in
+                        Text(line)
+                            .font(.system(.caption2, design: .monospaced))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .id(index)
+                    }
+                }
+                .padding(.horizontal)
+            }
+            .onChange(of: screen.log.count) { count in
+                proxy.scrollTo(count - 1)
+            }
+        }
+        .frame(maxHeight: 160)
+    }
+
+    private var stateLabel: String {
+        switch screen.session.state {
+        case .idle: "idle"
+        case .loading: "loading…"
+        case .playing: "playing ad"
+        case .paused: "paused"
+        case .finished(let outcome): "finished · \(outcome)"
+        }
+    }
+}
