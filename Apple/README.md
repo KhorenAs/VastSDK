@@ -65,12 +65,19 @@ control of its own, or `.disabled`.
 | `<AdVerifications>` parsed and handed over — VAST 3 and 4 shapes | ✅ |
 | Executing verification code (OM SDK) | ❌ by decision — `iVASTAdMeasurement` is the seam |
 | NonLinear · Companion · VPAID · SIMID · Icons | ❌ by decision |
-| VMAP (ad-break scheduling) | ❌ not yet |
+| VMAP (ad-break scheduling) | ❌ out of scope |
 
 Ignored elements are skipped, not rejected — an unknown element never fails a
 response. A response whose *only* creative is one of these is a different case:
 the slot was filled, so the server hears VAST error 201 ("expecting different
 linearity") on its own `<Error>` URI rather than being told it returned nothing.
+
+VMAP is out of scope rather than pending. It answers "when do breaks happen",
+which is a question about the content timeline — the host's, or its ad server's.
+This SDK answers "what plays in one break, and what is reported while it does".
+A host with a VMAP document reads the break times from it and calls `load` and
+`play` at each one; a host whose server already schedules breaks, as most
+app-side ad servers do, never needs it at all.
 
 ## Four decisions worth knowing
 
