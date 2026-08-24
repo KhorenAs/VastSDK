@@ -14,14 +14,34 @@ not code.
 
 ## Apple
 
-```bash
-cd Apple
-swift build
-swift test
+```swift
+.package(url: "https://github.com/KhorenAs/VastSDK.git", from: "1.0.0")
 ```
 
-See [Apple/README.md](Apple/README.md) for the API, what the SDK covers, and the
-two design decisions worth knowing before using it.
+Then depend on `VASTKit` (player and ad UI) or `VASTCore` alone (parsing,
+wrapper chains, pod scheduling and tracking, with no player at all).
+
+```swift
+let session = VASTAdSession(player: myPlayer)
+
+try await session.load(tag: adTagURL)   // follows Wrapper chains
+await session.play()                    // plays the pod, reports tracking
+```
+
+See [Apple/README.md](Apple/README.md) for the rest of the API, what the SDK
+covers, and the two design decisions worth knowing before using it.
+
+Working on the SDK itself:
+
+```bash
+swift build                 # or: cd Apple && swift build
+swift test                  # 111 tests
+```
+
+The manifest at the repository root and the one in `Apple/` describe the same
+targets. The root one exists because SwiftPM resolves a dependency URL by
+looking for `Package.swift` at the root; the one in `Apple/` is what
+`Examples/VASTDemo.xcodeproj` references as a local package.
 
 ## License
 
