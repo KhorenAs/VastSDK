@@ -75,6 +75,28 @@ private final class Builder: NSObject, XMLParserDelegate {
     private var pendingTrackingOffset: String?
     private var pendingMediaFile: [String: String] = [:]
 
+    /// Set by `<NonLinearAds>` or `<CompanionAds>`: creatives this SDK ignores,
+    /// but whose presence distinguishes "not playable here" from "no fill".
+    private var sawUnplayableCreative = false
+
+    // Current <AdVerifications>
+    //
+    // VAST 4 puts these under <InLine>/<Wrapper>; VAST 3 had no element for them
+    // and vendors shipped the same content inside <Extension type="AdVerifications">.
+    // Both shapes land in the same list — a host should not have to know which
+    // version the server speaks.
+    private var verifications: [VASTAd.Verification] = []
+    /// Inside `<AdVerifications>` — or the VAST 3 extension standing in for it.
+    private var insideVerifications = false
+    /// True while the extension currently open is that VAST 3 stand-in, so its
+    /// `</Extension>` closes the verification scope rather than a raw capture.
+    private var extensionIsVerifications = false
+    private var verificationVendor: String?
+    private var verificationResources: [VASTAd.Verification.Resource] = []
+    private var verificationParameters: String?
+    private var verificationNotExecuted: [URL] = []
+    private var pendingResource: [String: String] = [:]
+
     // Raw <Extension> capture
     private var extensions: [VASTAd.Extension] = []
     private var extensionDepth = 0
@@ -131,10 +153,38 @@ private final class Builder: NSObject, XMLParserDelegate {
         case "MediaFile":
             pendingMediaFile = attributes
 
+        case "AdVerifications":
+            insideVerifications = true
+
+        case "Verification":
+            verificationVendor = attributes["vendor"]
+            verificationResources = []
+            verificationParameters = nil
+            verificationNotExecuted = []
+            // A Verification outside <AdVerifications> is the VAST 3 shape with
+            // the wrapper element omitted; treat the scope as open either way.
+            insideVerifications = true
+
+        case "JavaScriptResource", "ExecutableResource":
+            pendingResource = attributes
+
         case "Extension":
+            // The VAST 3 stand-in is parsed, not captured raw: a host asking for
+            // `adVerifications` should get them whatever the server speaks, and
+            // returning the same content twice would invite double-reporting.
+            if attributes["type"]?.lowercased() == "adverifications" {
+                extensionIsVerifications = true
+                insideVerifications = true
+                return
+            }
             extensionDepth = 1
             extensionType = attributes["type"]
             extensionXML = ""
+
+        // Not parsed — but seeing one changes what an ad with no Linear means:
+        // the server filled the slot, just not with something playable here.
+        case "NonLinearAds", "CompanionAds":
+            sawUnplayableCreative = true
 
         default:
             break
@@ -220,7 +270,38 @@ private final class Builder: NSObject, XMLParserDelegate {
             appendMediaFile(url: value)
 
         case "Tracking":
-            appendTracking(url: value)
+            // `<TrackingEvents>` appears under both `<Linear>` and
+            // `<Verification>`. Without the scope, a verification's tracker would
+            // be filed as a creative event — and since `verificationNotExecuted`
+            // is not one, it would vanish instead.
+            if insideVerifications {
+                appendVerificationTracking(url: value)
+            } else {
+                appendTracking(url: value)
+            }
+
+        case "JavaScriptResource":
+            appendVerificationResource(kind: .javaScript, url: value)
+
+        case "ExecutableResource":
+            appendVerificationResource(kind: .executable, url: value)
+
+        case "VerificationParameters":
+            verificationParameters = value.isEmpty ? nil : value
+
+        case "Verification":
+            finishVerification()
+
+        case "AdVerifications":
+            insideVerifications = false
+
+        case "Extension":
+            // Only reached for the VAST 3 stand-in; a raw-captured extension is
+            // closed by the depth branch above and never falls through to here.
+            if extensionIsVerifications {
+                extensionIsVerifications = false
+                insideVerifications = false
+            }
 
         case "Linear", "Creative", "Creatives", "InLine", "TrackingEvents",
              "VideoClicks", "MediaFiles", "Extensions":
@@ -274,6 +355,46 @@ private final class Builder: NSObject, XMLParserDelegate {
         ))
     }
 
+    private func appendVerificationResource(kind: VASTAd.Verification.Resource.Kind, url value: String) {
+        let attributes = pendingResource
+        pendingResource = [:]
+        guard insideVerifications, let url = Self.url(value) else { return }
+        verificationResources.append(VASTAd.Verification.Resource(
+            kind: kind,
+            url: url,
+            apiFramework: attributes["apiFramework"],
+            browserOptional: Self.bool(attributes["browserOptional"], default: false),
+            type: attributes["type"]
+        ))
+    }
+
+    /// The only tracker a `<Verification>` may carry (§3.16).
+    private func appendVerificationTracking(url value: String) {
+        let event = pendingTrackingEvent
+        defer { pendingTrackingEvent = nil; pendingTrackingOffset = nil }
+        guard event == "verificationNotExecuted", let url = Self.url(value) else { return }
+        verificationNotExecuted.append(url)
+    }
+
+    /// A `<Verification>` with no resource at all asks for nothing and is dropped;
+    /// one with only an unusable resource is kept, because the vendor still
+    /// expects to hear why it did not run.
+    private func finishVerification() {
+        defer {
+            verificationVendor = nil
+            verificationResources = []
+            verificationParameters = nil
+            verificationNotExecuted = []
+        }
+        guard !verificationResources.isEmpty else { return }
+        verifications.append(VASTAd.Verification(
+            vendor: verificationVendor,
+            resources: verificationResources,
+            parameters: verificationParameters,
+            notExecutedTrackers: verificationNotExecuted
+        ))
+    }
+
     private func finishAd() {
         let entry: VASTDocument.Entry
 
@@ -288,15 +409,25 @@ private final class Builder: NSObject, XMLParserDelegate {
                     clickTracking: clickTracking,
                     clickThrough: clickThrough,
                     extensions: extensions,
+                    verifications: verifications,
                     followAdditionalWrappers: followAdditionalWrappers,
                     allowMultipleAds: allowMultipleAds,
                     fallbackOnNoAd: fallbackOnNoAd
                 )
             ))
         } else {
-            // An InLine with no playable Linear is not an ad — dropping it here
-            // keeps "no fill" and "broken creative" distinguishable downstream.
-            guard !mediaFiles.isEmpty || duration > 0 else { resetAd(); return }
+            // An InLine with no playable Linear is not an ad. If it offered a
+            // NonLinear or Companion creative the slot was filled — the response
+            // is simply the wrong linearity, and §2.3.6 reserves 201 for that.
+            // Dropping it silently reported "no fill" and threw away the
+            // `<Error>` URI the server expected to hear on.
+            guard !mediaFiles.isEmpty || duration > 0 else {
+                if sawUnplayableCreative {
+                    entries.append(.init(id: adID, sequence: adSequence, body: .unplayableCreative(errors: errors)))
+                }
+                resetAd()
+                return
+            }
             entry = VASTDocument.Entry(id: adID, sequence: adSequence, body: .inLine(
                 VASTAd(
                     id: adID,
@@ -314,7 +445,8 @@ private final class Builder: NSObject, XMLParserDelegate {
                     ),
                     impressions: impressions,
                     errors: errors,
-                    extensions: extensions
+                    extensions: extensions,
+                    adVerifications: verifications
                 )
             ))
         }
@@ -330,7 +462,10 @@ private final class Builder: NSObject, XMLParserDelegate {
         followAdditionalWrappers = true; allowMultipleAds = false; fallbackOnNoAd = nil
         duration = 0; skipOffset = nil; mediaFiles = []
         clickThrough = nil; clickTracking = []; tracking = [:]; progress = []
-        extensions = []
+        extensions = []; sawUnplayableCreative = false
+        verifications = []; insideVerifications = false; extensionIsVerifications = false
+        verificationVendor = nil; verificationResources = []
+        verificationParameters = nil; verificationNotExecuted = []; pendingResource = [:]
     }
 
     private func append(_ value: String, to list: inout [URL]) {

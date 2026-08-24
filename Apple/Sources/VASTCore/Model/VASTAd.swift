@@ -24,6 +24,16 @@ public struct VASTAd: Sendable, Identifiable {
     public let errors: [URL]
     /// Vendor-specific `<Extensions>`, handed to the host untouched (§3.18).
     public let extensions: [Extension]
+    /// `<AdVerifications>` (§3.16), accumulated from the whole Wrapper chain and
+    /// normalised across VAST 3 and 4 shapes. Parsed, never executed — see
+    /// `VASTAd.Verification`.
+    public let adVerifications: [Verification]
+    /// The `id` of every Wrapper crossed to reach this ad, outermost first.
+    ///
+    /// Empty for a direct InLine response. Reporting pipelines use this to say
+    /// which intermediary served an ad, so it is kept rather than discarded with
+    /// the rest of the Wrapper once the chain is flattened.
+    public let wrapperAdIDs: [String]
 
     public init(
         id: String,
@@ -33,7 +43,9 @@ public struct VASTAd: Sendable, Identifiable {
         linear: Linear,
         impressions: [URL] = [],
         errors: [URL] = [],
-        extensions: [Extension] = []
+        extensions: [Extension] = [],
+        adVerifications: [Verification] = [],
+        wrapperAdIDs: [String] = []
     ) {
         self.id = id
         self.sequence = sequence
@@ -43,6 +55,8 @@ public struct VASTAd: Sendable, Identifiable {
         self.impressions = impressions
         self.errors = errors
         self.extensions = extensions
+        self.adVerifications = adVerifications
+        self.wrapperAdIDs = wrapperAdIDs
     }
 
     public var isSkippable: Bool { linear.skipOffset != nil }

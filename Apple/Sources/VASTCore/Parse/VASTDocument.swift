@@ -12,6 +12,11 @@ public struct VASTDocument: Sendable {
         case inLine(VASTAd)
         /// `<Wrapper>` — carries its own trackers plus the next tag to fetch.
         case wrapper(Wrapper)
+        /// An `<InLine>` whose only creatives are ones this SDK does not play —
+        /// `<NonLinearAds>`, `<CompanionAds>`. Kept rather than dropped so the
+        /// server hears 201 ("expecting different linearity") instead of being
+        /// told it returned nothing, and so its `<Error>` URIs still fire.
+        case unplayableCreative(errors: [URL])
     }
 
     public struct Entry: Sendable {
@@ -38,6 +43,9 @@ public extension VASTDocument {
         public let clickTracking: [URL]
         public let clickThrough: URL?
         public let extensions: [VASTAd.Extension]
+        /// Verification vendors are usually injected by an intermediary rather
+        /// than the advertiser, so a Wrapper carrying them is the common case.
+        public let verifications: [VASTAd.Verification]
         /// Default `true` (§3.19).
         public let followAdditionalWrappers: Bool
         /// Default `false` (§3.19).

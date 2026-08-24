@@ -50,11 +50,19 @@ public struct VASTTrackingEngine: Sendable {
     /// True when the caller pinned the duration, in which case reported values
     /// are ignored.
     private let durationIsPinned: Bool
+    /// Whether something is going to execute the ad's verification resources.
+    ///
+    /// The engine cannot know this — running verification code means an Open
+    /// Measurement integration, which lives above this layer — so it is stated
+    /// by whoever built the engine. When nothing will run them, the vendors are
+    /// owed `verificationNotExecuted` rather than silence.
+    private let measurementWillRun: Bool
 
-    public init(ad: VASTAd, duration: TimeInterval? = nil) {
+    public init(ad: VASTAd, duration: TimeInterval? = nil, measurementWillRun: Bool = false) {
         self.ad = ad
         self.duration = duration ?? ad.linear.duration
         self.durationIsPinned = duration != nil
+        self.measurementWillRun = measurementWillRun
     }
 
     // MARK: - Input
@@ -165,10 +173,28 @@ public struct VASTTrackingEngine: Sendable {
             beacons += ad.impressions.map {
                 VASTBeacon(kind: .impression, url: $0, adID: ad.id)
             }
+            // Reported with the impression, not later: the vendor is deciding
+            // right now whether this session counts as measured.
+            beacons += verificationsNotExecuted()
             beacons += fire(.creativeView)
         }
         beacons += fire(.start)
         return beacons
+    }
+
+    /// One beacon per tracker of every vendor whose code will not run.
+    ///
+    /// Reason 2 (`resourceLoadError`) never originates here — only whoever tried
+    /// to load a resource can report that, and by definition nothing tried.
+    private func verificationsNotExecuted() -> [VASTBeacon] {
+        guard !measurementWillRun else { return [] }
+        return ad.adVerifications.flatMap { verification in
+            let reason: VASTAd.Verification.NotExecutedReason =
+                verification.omidResource == nil ? .resourceNotSupported : .notExecuted
+            return verification.notExecutedTrackers.map {
+                VASTBeacon(kind: .verificationNotExecuted(reason), url: $0, adID: ad.id)
+            }
+        }
     }
 
     private mutating func quartileBeacons() -> [VASTBeacon] {

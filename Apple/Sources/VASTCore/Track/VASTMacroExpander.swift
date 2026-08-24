@@ -26,6 +26,9 @@ public struct VASTMacroExpander: Sendable {
     public struct Context: Sendable {
 
         public var errorCode: VASTError?
+        /// Why a verification vendor's code did not run, for `[REASON]` on a
+        /// `verificationNotExecuted` tracker (§3.16). Unset on every other beacon.
+        public var verificationNotExecutedReason: VASTAd.Verification.NotExecutedReason?
         /// Playhead within the ad creative.
         public var adPlayhead: TimeInterval?
         /// Playhead within the content the ad interrupted.
@@ -44,6 +47,7 @@ public struct VASTMacroExpander: Sendable {
 
         public init(
             errorCode: VASTError? = nil,
+            verificationNotExecutedReason: VASTAd.Verification.NotExecutedReason? = nil,
             adPlayhead: TimeInterval? = nil,
             contentPlayhead: TimeInterval? = nil,
             assetURI: URL? = nil,
@@ -56,6 +60,7 @@ public struct VASTMacroExpander: Sendable {
             custom: [String: String] = [:]
         ) {
             self.errorCode = errorCode
+            self.verificationNotExecutedReason = verificationNotExecutedReason
             self.adPlayhead = adPlayhead
             self.contentPlayhead = contentPlayhead
             self.assetURI = assetURI
@@ -80,7 +85,7 @@ public struct VASTMacroExpander: Sendable {
         "BLOCKEDADCATEGORIES", "CLICKTYPE", "GDPRCONSENT", "LIMITADTRACKING",
         "REGULATIONS", "TRANSACTIONID", "PLACEMENTTYPE", "INVENTORYSTATE",
         "CONTENTID", "CONTENTURI", "MEDIAMIME", "OMIDPARTNER", "VASTVERSIONS",
-        "APIFRAMEWORKS", "EXTENSIONS", "VERIFICATIONVENDORS",
+        "APIFRAMEWORKS", "EXTENSIONS", "VERIFICATIONVENDORS", "REASON",
     ]
 
     /// Reported for a macro the spec defines but this player does not know.
@@ -165,6 +170,9 @@ public struct VASTMacroExpander: Sendable {
         switch name {
         case "ERRORCODE":
             return context.errorCode.map { String($0.rawValue) } ?? Self.unknownValue
+
+        case "REASON":
+            return context.verificationNotExecutedReason.map { String($0.rawValue) } ?? Self.unknownValue
 
         case "ADPLAYHEAD", "MEDIAPLAYHEAD":
             // MEDIAPLAYHEAD is the pre-4.1 spelling of the same value.

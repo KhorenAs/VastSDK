@@ -4,7 +4,7 @@ A native VAST 4.3 linear-video ad SDK. No Google IMA, no VPAID, no WebView.
 
 | Platform | Status |
 |---|---|
-| [Apple](Apple/) — iOS · tvOS · macOS | Implemented. 111 tests. |
+| [Apple](Apple/) — iOS · tvOS · macOS | Implemented. 136 tests. |
 | [Android](Android/) | Not started. |
 | [Web](Web/) | Not started. |
 
@@ -29,13 +29,13 @@ await session.play()                    // plays the pod, reports tracking
 ```
 
 See [Apple/README.md](Apple/README.md) for the rest of the API, what the SDK
-covers, and the two design decisions worth knowing before using it.
+covers, and the design decisions worth knowing before using it.
 
 Working on the SDK itself:
 
 ```bash
 swift build                 # or: cd Apple && swift build
-swift test                  # 111 tests
+swift test                  # 136 tests
 ```
 
 The manifest at the repository root and the one in `Apple/` describe the same

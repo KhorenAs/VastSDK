@@ -257,9 +257,15 @@ extension VASTAdSession {
             isMuted: lastTick?.isMuted
         )
         // Only an error beacon carries a code, and it is the code for *this*
-        // failure — not the last one the session happened to see.
-        if case .error(let error) = beacon.kind {
+        // failure — not the last one the session happened to see. `[REASON]`
+        // works the same way: it belongs to the beacon, not to the session.
+        switch beacon.kind {
+        case .error(let error):
             context.errorCode = error
+        case .verificationNotExecuted(let reason):
+            context.verificationNotExecutedReason = reason
+        default:
+            break
         }
         return VASTBeacon(
             kind: beacon.kind,
@@ -272,6 +278,7 @@ extension VASTAdSession {
     private func update(with tick: VASTTick, ad: VASTAd) {
         let duration = tick.duration ?? ad.linear.duration
         remainingTime = max(0, duration - tick.adTime)
+        delegate?.session(self, ad: ad, didProgressTo: tick.adTime, duration: duration)
 
         guard let unlockAt = ad.linear.resolvedSkipOffset() else {
             timeUntilSkip = nil

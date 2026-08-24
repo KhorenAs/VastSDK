@@ -78,5 +78,37 @@ public extension VASTAd {
             self.type = type
             self.xml = xml
         }
+
+        /// The text of a direct child element, e.g. `value(of: "UiHideable")` on a
+        /// `uiSettings` extension.
+        ///
+        /// Reading a vendor key should not mean writing a string scanner in every
+        /// host. This still assigns the value no meaning — whether `"1"` means the
+        /// UI should hide is the vendor's convention, and the host's to apply.
+        ///
+        /// `nil` when the element is absent; an element present but empty yields
+        /// `""`, which is a different fact and is reported as such.
+        public func value(of element: String) -> String? {
+            guard let openStart = xml.range(of: "<\(element)"),
+                  let openEnd = xml[openStart.upperBound...].firstIndex(of: ">")
+            else { return nil }
+
+            // `<UiHideable/>` carries no text, and its ">" belongs to the open tag.
+            if xml[openStart.upperBound..<openEnd].hasSuffix("/") { return "" }
+
+            let bodyStart = xml.index(after: openEnd)
+            guard let closeStart = xml.range(of: "</\(element)>", range: bodyStart..<xml.endIndex)
+            else { return nil }
+
+            return Self.text(in: String(xml[bodyStart..<closeStart.lowerBound]))
+        }
+
+        /// Ad servers wrap extension values in CDATA about as often as not.
+        private static func text(in body: String) -> String {
+            let trimmed = body.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("<![CDATA["), trimmed.hasSuffix("]]>") else { return trimmed }
+            return String(trimmed.dropFirst(9).dropLast(3))
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+        }
     }
 }

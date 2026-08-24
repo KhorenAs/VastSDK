@@ -34,16 +34,26 @@ final class VASTWrapperChainTests: XCTestCase {
         impression: String,
         clickThrough: String? = nil,
         follow: Bool = true,
-        allowMultipleAds: Bool = false
+        allowMultipleAds: Bool = false,
+        adID: String = "w",
+        verificationVendor: String? = nil
     ) -> String {
         let click = clickThrough.map {
             "<VideoClicks><ClickThrough><![CDATA[\($0)]]></ClickThrough></VideoClicks>"
         } ?? ""
+        let verifications = verificationVendor.map {
+            """
+            <AdVerifications><Verification vendor="\($0)">
+              <JavaScriptResource apiFramework="omid"><![CDATA[https://\($0)/omid.js]]></JavaScriptResource>
+            </Verification></AdVerifications>
+            """
+        } ?? ""
         return """
-        <VAST version="4.3"><Ad id="w"><Wrapper followAdditionalWrappers="\(follow)" allowMultipleAds="\(allowMultipleAds)">
+        <VAST version="4.3"><Ad id="\(adID)"><Wrapper followAdditionalWrappers="\(follow)" allowMultipleAds="\(allowMultipleAds)">
           <VASTAdTagURI><![CDATA[\(tag)]]></VASTAdTagURI>
           <Error><![CDATA[\(error)]]></Error>
           <Impression><![CDATA[\(impression)]]></Impression>
+          \(verifications)
           <Creatives><Creative><Linear>
             <TrackingEvents><Tracking event="start"><![CDATA[https://ads.test/w-start]]></Tracking></TrackingEvents>
             \(click)
@@ -101,6 +111,118 @@ final class VASTWrapperChainTests: XCTestCase {
         XCTAssertEqual(ad.impressions.count, 3, "inline + two wrappers")
         XCTAssertEqual(ad.errors.count, 3)
         XCTAssertEqual(ad.linear.trackingEvents[.start]?.count, 3)
+    }
+
+    /// Flattening the chain must not lose which intermediaries served the ad:
+    /// reporting attributes fill and discrepancies by wrapper.
+    func testWrapperAdIDsAreCollectedOutermostFirst() async throws {
+        let resolution = try await resolver([
+            "https://ads.test/tag.xml": wrapper(to: "https://ads.test/w2.xml", error: "https://ads.test/e1", impression: "https://ads.test/i1", adID: "dsp-outer"),
+            "https://ads.test/w2.xml": wrapper(to: "https://ads.test/inline.xml", error: "https://ads.test/e2", impression: "https://ads.test/i2", adID: "ssp-inner"),
+            "https://ads.test/inline.xml": inLine(),
+        ]).resolve(tag: base)
+
+        let ad = try XCTUnwrap(resolution.ads.first)
+        XCTAssertEqual(ad.wrapperAdIDs, ["dsp-outer", "ssp-inner"])
+        XCTAssertEqual(ad.id, "inline", "the ad's own id is not one of its wrappers")
+    }
+
+    /// A direct response crossed no wrapper, so the list is empty rather than
+    /// carrying the ad's own id.
+    func testDirectInLineHasNoWrapperAdIDs() async throws {
+        let resolution = try await resolver([
+            "https://ads.test/tag.xml": inLine(),
+        ]).resolve(tag: base)
+
+        XCTAssertEqual(resolution.ads.first?.wrapperAdIDs, [])
+    }
+
+    // MARK: - AdVerifications
+
+    /// Measurement vendors are injected by intermediaries far more often than by
+    /// the advertiser, so a verification that only ever appears on a Wrapper is
+    /// the ordinary case — not an edge one.
+    func testVerificationsFromWrappersReachTheInLineAd() async throws {
+        let resolution = try await resolver([
+            "https://ads.test/tag.xml": wrapper(to: "https://ads.test/inline.xml", error: "https://ads.test/e1", impression: "https://ads.test/i1", verificationVendor: "dsp-vendor"),
+            "https://ads.test/inline.xml": inLine(),
+        ]).resolve(tag: base)
+
+        let ad = try XCTUnwrap(resolution.ads.first)
+        XCTAssertEqual(ad.adVerifications.map(\.vendor), ["dsp-vendor"])
+        XCTAssertNotNil(ad.adVerifications.first?.omidResource)
+    }
+
+    /// A duplicate tracker is a harmless second request; a duplicate verification
+    /// is a second measurement session for a vendor that asked for one.
+    func testTheSameVendorInjectedTwiceIsKeptOnce() async throws {
+        let resolution = try await resolver([
+            "https://ads.test/tag.xml": wrapper(to: "https://ads.test/w2.xml", error: "https://ads.test/e1", impression: "https://ads.test/i1", adID: "w1", verificationVendor: "shared-vendor"),
+            "https://ads.test/w2.xml": wrapper(to: "https://ads.test/inline.xml", error: "https://ads.test/e2", impression: "https://ads.test/i2", adID: "w2", verificationVendor: "shared-vendor"),
+            "https://ads.test/inline.xml": inLine(),
+        ]).resolve(tag: base)
+
+        XCTAssertEqual(resolution.ads.first?.adVerifications.count, 1)
+    }
+
+    /// Different vendors across the chain all survive.
+    func testDifferentVendorsAccumulateAcrossTheChain() async throws {
+        let resolution = try await resolver([
+            "https://ads.test/tag.xml": wrapper(to: "https://ads.test/w2.xml", error: "https://ads.test/e1", impression: "https://ads.test/i1", adID: "w1", verificationVendor: "vendor-a"),
+            "https://ads.test/w2.xml": wrapper(to: "https://ads.test/inline.xml", error: "https://ads.test/e2", impression: "https://ads.test/i2", adID: "w2", verificationVendor: "vendor-b"),
+            "https://ads.test/inline.xml": inLine(),
+        ]).resolve(tag: base)
+
+        XCTAssertEqual(resolution.ads.first?.adVerifications.map(\.vendor), ["vendor-a", "vendor-b"])
+    }
+
+    // MARK: - Linearity
+
+    /// A filled slot the player cannot use is not "no fill". §2.3.6 gives 201 to
+    /// "video player expecting different linearity", and reporting 303 instead
+    /// tells the server it returned nothing — so it keeps sending the same thing.
+    func testNonLinearOnlyResponseIsReportedAsUnexpectedLinearity() async throws {
+        let nonLinearOnly = """
+        <VAST version="4.3"><Ad id="overlay-1"><InLine>
+          <AdSystem>test</AdSystem>
+          <Error><![CDATA[https://ads.test/overlay-error]]></Error>
+          <Impression><![CDATA[https://ads.test/overlay-impression]]></Impression>
+          <Creatives><Creative><NonLinearAds>
+            <NonLinear width="300" height="50">
+              <StaticResource creativeType="image/png"><![CDATA[https://ads.test/banner.png]]></StaticResource>
+            </NonLinear>
+          </NonLinearAds></Creative></Creatives>
+        </InLine></Ad></VAST>
+        """
+
+        do {
+            _ = try await resolver(["https://ads.test/tag.xml": nonLinearOnly]).resolve(tag: base)
+            XCTFail("a response with no Linear creative cannot resolve to a playable ad")
+        } catch let failure as VASTTagResolver.Failure {
+            XCTAssertEqual(failure.error, .unexpectedLinearity)
+            XCTAssertEqual(VASTError.unexpectedLinearity.rawValue, 201)
+
+            // The ad's own <Error> used to be discarded with the ad itself.
+            XCTAssertEqual(
+                failure.beacons.map(\.url.absoluteString),
+                ["https://ads.test/overlay-error"],
+                "the server hears about it on the URI it supplied"
+            )
+        }
+    }
+
+    /// An empty response is still 303: nothing was returned to misreport.
+    func testTrulyEmptyResponseIsStillNoFill() async throws {
+        let empty = """
+        <VAST version="4.3"><Error><![CDATA[https://ads.test/no-ad]]></Error></VAST>
+        """
+
+        do {
+            _ = try await resolver(["https://ads.test/tag.xml": empty]).resolve(tag: base)
+            XCTFail("an empty response has no ad")
+        } catch let failure as VASTTagResolver.Failure {
+            XCTAssertEqual(failure.error, .noVASTResponseAfterWrappers)
+        }
     }
 
     /// A relative `VASTAdTagURI` is what real responses send.

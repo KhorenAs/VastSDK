@@ -75,5 +75,6 @@ final class VASTRealWorldTagTests: XCTestCase {
         let ad = try adFoxAd()
         let uiSettings = try XCTUnwrap(ad.extensions.first { $0.type == "uiSettings" })
         XCTAssertTrue(uiSettings.xml.contains("UiHideable"))
+        XCTAssertEqual(uiSettings.value(of: "UiHideable"), "1", "read without scanning the string by hand")
     }
 }

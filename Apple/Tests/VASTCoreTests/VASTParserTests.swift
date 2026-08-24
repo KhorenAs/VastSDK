@@ -84,6 +84,31 @@ final class VASTParserTests: XCTestCase {
         XCTAssertFalse(try XCTUnwrap(ad.extensions.first).xml.isEmpty)
     }
 
+    /// Reading a vendor key should not mean writing a string scanner in every
+    /// host — but the SDK still assigns the value no meaning.
+    func testExtensionValueReadsAChildElement() {
+        let plain = VASTAd.Extension(type: "uiSettings", xml: "<UiHideable>1</UiHideable>")
+        XCTAssertEqual(plain.value(of: "UiHideable"), "1")
+
+        let cdata = VASTAd.Extension(type: "uiSettings", xml: "<UiHideable><![CDATA[0]]></UiHideable>")
+        XCTAssertEqual(cdata.value(of: "UiHideable"), "0", "servers wrap in CDATA about as often as not")
+
+        let attributed = VASTAd.Extension(type: "uiSettings", xml: #"<UiHideable mode="strict"> 1 </UiHideable>"#)
+        XCTAssertEqual(attributed.value(of: "UiHideable"), "1")
+    }
+
+    /// Absent and present-but-empty are different facts, and a host acting on the
+    /// key needs to tell them apart.
+    func testExtensionValueDistinguishesAbsentFromEmpty() {
+        let extensionXML = VASTAd.Extension(
+            type: "uiSettings",
+            xml: "<UiHideable></UiHideable><Skin/>"
+        )
+        XCTAssertEqual(extensionXML.value(of: "UiHideable"), "")
+        XCTAssertEqual(extensionXML.value(of: "Skin"), "", "self-closing carries no text")
+        XCTAssertNil(extensionXML.value(of: "Missing"))
+    }
+
     // MARK: - Wrapper
 
     func testParsesWrapperAndItsAttributes() throws {

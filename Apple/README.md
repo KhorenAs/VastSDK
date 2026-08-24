@@ -10,7 +10,7 @@ Sources/
   Harness/    runnable logic harness: `swift run Harness`
 Examples/
   VASTDemo.xcodeproj    SwiftUIDemo · UIKitDemo · AppKitDemo
-Tests/        111 tests
+Tests/        136 tests
 Reference/    IAB VAST 4.0/4.1/4.2 XSD schemas
 ```
 
@@ -54,18 +54,30 @@ requires while the host owns the look.
 | VAST 2.0/3.0 legacy event names | ✅ |
 | §6 macros (`[ERRORCODE]`, `[ADPLAYHEAD]`, `[CACHEBUSTING]`, …) | ✅ |
 | `<Extensions>` handed to the host raw | ✅ |
-| NonLinear · Companion · VPAID · SIMID · OMID · Icons | ❌ by decision |
+| `<AdVerifications>` parsed and handed over — VAST 3 and 4 shapes | ✅ |
+| Executing verification code (OM SDK) | ❌ by decision |
+| NonLinear · Companion · VPAID · SIMID · Icons | ❌ by decision |
 | VMAP (ad-break scheduling) | ❌ not yet |
 
 Ignored elements are skipped, not rejected — an unknown element never fails a
-response.
+response. A response whose *only* creative is one of these is a different case:
+the slot was filled, so the server hears VAST error 201 ("expecting different
+linearity") on its own `<Error>` URI rather than being told it returned nothing.
 
-## Two decisions worth knowing
+## Three decisions worth knowing
 
 **Compliance is enforced, not hoped for.** `SkipPresentation` says who provides
 the skip control. Under `.unsupported`, a skippable ad is refused with VAST error
 200 rather than played without one, because §2.3 forbids exactly that. The
 default is `.sdk`, so a host that configures nothing is compliant.
+
+**Verification is described, not executed.** `<AdVerifications>` is parsed —
+including the VAST 3 shape, where vendors shipped it inside
+`<Extension type="AdVerifications">` — and normalised into `ad.adVerifications`,
+so a host cannot tell which version answered. Running that code means the IAB
+Open Measurement SDK, which is licensed separately and stays outside this
+package. What the SDK keeps is enough to hand a measurement layer its resources,
+and enough to report honestly on `verificationNotExecuted` when nothing runs them.
 
 **The correctness-critical logic never touches AVPlayer.** `VASTCore` cannot
 import AVFoundation — the compiler enforces it. Time arrives as `VASTTick`
@@ -97,7 +109,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 111 tests
+swift test                  # 136 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 

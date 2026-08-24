@@ -13,6 +13,18 @@ public protocol iVASTAdSessionDelegate: AnyObject {
 
     func session(_ session: VASTAdSession, didStart ad: VASTAd, at position: VASTAdSession.AdPosition)
 
+    /// Playback position, once per tick.
+    ///
+    /// `duration` is what the player reports, falling back to `<Duration>` until
+    /// it does — the declared value is advisory and the two often disagree.
+    /// SwiftUI hosts can read `remainingTime` instead of implementing this.
+    func session(
+        _ session: VASTAdSession,
+        ad: VASTAd,
+        didProgressTo time: TimeInterval,
+        duration: TimeInterval
+    )
+
     /// `skipoffset` elapsed — draw the skip control now.
     func session(_ session: VASTAdSession, skipDidBecomeAvailableFor ad: VASTAd)
 
@@ -31,6 +43,12 @@ public protocol iVASTAdSessionDelegate: AnyObject {
 
 public extension iVASTAdSessionDelegate {
     func session(_ session: VASTAdSession, didStart ad: VASTAd, at position: VASTAdSession.AdPosition) {}
+    func session(
+        _ session: VASTAdSession,
+        ad: VASTAd,
+        didProgressTo time: TimeInterval,
+        duration: TimeInterval
+    ) {}
     func session(_ session: VASTAdSession, skipDidBecomeAvailableFor ad: VASTAd) {}
     func session(_ session: VASTAdSession, didFinish ad: VASTAd, outcome: VASTAdSession.Outcome) {}
     func session(_ session: VASTAdSession, didFail error: VASTError, for ad: VASTAd?) {}

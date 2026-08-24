@@ -203,6 +203,7 @@ private extension VASTBeacon {
         case .progress: url.lastPathComponent
         case .clickTracking: "clickTracking"
         case .error(let error): "error \(error.rawValue)"
+        case .verificationNotExecuted(let reason): "verificationNotExecuted \(reason.rawValue)"
         }
     }
 }

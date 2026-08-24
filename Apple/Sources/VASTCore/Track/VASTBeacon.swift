@@ -17,6 +17,10 @@ public struct VASTBeacon: Sendable, Equatable {
         case progress(TimeInterval)
         case clickTracking
         case error(VASTError)
+        /// A verification vendor asked to observe this ad and nothing ran its
+        /// code (§3.16). Silence would let the vendor count the session as
+        /// measured, so the reason is reported rather than withheld.
+        case verificationNotExecuted(VASTAd.Verification.NotExecutedReason)
     }
 
     public let kind: Kind

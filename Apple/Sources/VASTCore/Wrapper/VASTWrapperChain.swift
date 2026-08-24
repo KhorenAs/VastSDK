@@ -35,6 +35,9 @@ public struct VASTWrapperChain: Sendable {
     /// overwritten as the chain descends and by the InLine itself if it has one.
     private var clickThrough: URL?
     private var extensions: [VASTAd.Extension] = []
+    private var verifications: [VASTAd.Verification] = []
+    /// `<Ad id>` of each Wrapper crossed, in the order they were crossed.
+    private var wrapperAdIDs: [String] = []
     private var allowMultipleAds = false
 
     /// §3.19.1: "the player is only required to accept five wrappers".
@@ -68,10 +71,17 @@ public struct VASTWrapperChain: Sendable {
         }
 
         // No InLine yet, so this is another Wrapper hop.
-        guard let wrapper = firstWrapper(in: document) else {
+        guard let (adID, wrapper) = firstWrapper(in: document) else {
+            // Unless the response did contain an ad, just not one with a Linear
+            // creative. The server filled the slot; the player wanted a different
+            // linearity, and §2.3.6 gives that its own code.
+            if let unplayable = firstUnplayableCreative(in: document) {
+                accumulatedErrors += unplayable
+                return .failed(.unexpectedLinearity)
+            }
             return .failed(.wrapperGeneral)
         }
-        absorb(wrapper)
+        absorb(wrapper, adID: adID)
 
         guard depth < maxDepth else {
             return .failed(.wrapperLimitReached)
@@ -114,21 +124,48 @@ public struct VASTWrapperChain: Sendable {
 
     // MARK: - Accumulation
 
-    private func firstWrapper(in document: VASTDocument) -> VASTDocument.Wrapper? {
+    private func firstWrapper(in document: VASTDocument) -> (adID: String, wrapper: VASTDocument.Wrapper)? {
         // A pod's members are handled once the chain resolves; redirection itself
         // follows a single tag, and `allowMultipleAds` governs what the response
         // to it may contain.
         for entry in document.entries {
-            if case .wrapper(let wrapper) = entry.body { return wrapper }
+            if case .wrapper(let wrapper) = entry.body { return (entry.id, wrapper) }
         }
         return nil
     }
 
-    private mutating func absorb(_ wrapper: VASTDocument.Wrapper) {
+    /// Verifications accumulate like trackers, with one difference that matters:
+    /// a duplicate tracker is a harmless second request, while a duplicate
+    /// verification is a second measurement session for a vendor that asked for
+    /// one. Two intermediaries injecting the same vendor is ordinary, so the
+    /// first mention of a (vendor, resource) pair wins and later ones are dropped.
+    private mutating func absorb(verifications incoming: [VASTAd.Verification]) {
+        for verification in incoming {
+            let isDuplicate = verifications.contains {
+                $0.vendor == verification.vendor
+                    && $0.resources.map(\.url) == verification.resources.map(\.url)
+            }
+            if !isDuplicate { verifications.append(verification) }
+        }
+    }
+
+    /// The `<Error>` URIs of the first ad that was filled but not playable here.
+    private func firstUnplayableCreative(in document: VASTDocument) -> [URL]? {
+        for entry in document.entries {
+            if case .unplayableCreative(let errors) = entry.body { return errors }
+        }
+        return nil
+    }
+
+    private mutating func absorb(_ wrapper: VASTDocument.Wrapper, adID: String) {
         impressions += wrapper.impressions
         accumulatedErrors += wrapper.errors
         clickTracking += wrapper.clickTracking
         extensions += wrapper.extensions
+        absorb(verifications: wrapper.verifications)
+        // An ad server that omits `<Ad id>` on a Wrapper leaves nothing to report,
+        // and an empty string in the chain would read as a real intermediary.
+        if !adID.isEmpty { wrapperAdIDs.append(adID) }
         allowMultipleAds = wrapper.allowMultipleAds
         for (event, urls) in wrapper.trackingEvents {
             tracking[event, default: []] += urls
@@ -165,8 +202,24 @@ public struct VASTWrapperChain: Sendable {
             ),
             impressions: ad.impressions + impressions,
             errors: ad.errors + accumulatedErrors,
-            extensions: ad.extensions + extensions
+            extensions: ad.extensions + extensions,
+            adVerifications: mergedVerifications(for: ad),
+            wrapperAdIDs: wrapperAdIDs
         )
+    }
+
+    /// The InLine's own verifications first — it is closest to the creative —
+    /// then the chain's, skipping vendors it already asked for.
+    private func mergedVerifications(for ad: VASTAd) -> [VASTAd.Verification] {
+        var merged = ad.adVerifications
+        for verification in verifications {
+            let isDuplicate = merged.contains {
+                $0.vendor == verification.vendor
+                    && $0.resources.map(\.url) == verification.resources.map(\.url)
+            }
+            if !isDuplicate { merged.append(verification) }
+        }
+        return merged
     }
 
     /// Real responses redirect with a relative `VASTAdTagURI`.

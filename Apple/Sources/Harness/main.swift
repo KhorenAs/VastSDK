@@ -48,6 +48,7 @@ func label(_ beacon: VASTBeacon) -> String {
     case .progress(let offset): "progress@\(Int(offset))s"
     case .clickTracking: "clickTracking"
     case .error(let error): "error \(error.rawValue)"
+    case .verificationNotExecuted(let reason): "verificationNotExecuted \(reason.rawValue)"
     }
 }
 
@@ -118,6 +119,9 @@ for name in ["inline-linear", "wrapper-a", "wrapper-multiple-ads", "empty-no-ad"
                 print("   Wrapper \(entry.id) seq=\(entry.sequence.map(String.init) ?? "—") → \(wrapper.tagURI.absoluteString)")
                 print("     follow=\(wrapper.followAdditionalWrappers) multi=\(wrapper.allowMultipleAds) "
                     + "imp=\(wrapper.impressions.count) err=\(wrapper.errors.count)")
+            case .unplayableCreative(let errors):
+                print("   Unplayable \(entry.id) — filled, but no Linear creative (VAST error 201)")
+                print("     err=\(errors.count)")
             }
         }
         print("")
