@@ -33,6 +33,23 @@ enum DemoCatalog {
         img_bipbop_adv_example_ts/master.m3u8
         """)!
 
+    /// Stamps a live tag with a fresh `correlator` before requesting it.
+    ///
+    /// Google's ad server dedupes on that parameter: sent empty, the first
+    /// request is filled and every one after it returns an empty VAST — which
+    /// the SDK correctly reports as error 303, and which looks exactly like a
+    /// bug in the SDK. IMA generates this value itself, so a host driving its
+    /// own player has to do the same.
+    ///
+    /// Substituted textually rather than through `URLComponents`, which would
+    /// re-encode `cust_params=sample_ct%3Dlinear` and change the request.
+    static func requestReady(_ tag: URL) -> URL {
+        let string = tag.absoluteString
+        guard string.hasSuffix("correlator=") || string.contains("correlator=&") else { return tag }
+        let stamp = String(UInt64(Date().timeIntervalSince1970 * 1000))
+        return URL(string: string.replacingOccurrences(of: "correlator=", with: "correlator=\(stamp)")) ?? tag
+    }
+
     static let scenarios: [DemoScenario] = [
         DemoScenario(
             id: "live-linear",

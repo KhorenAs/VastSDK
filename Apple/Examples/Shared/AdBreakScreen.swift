@@ -126,7 +126,7 @@ final class AdBreakScreen: ObservableObject {
         note("load \(scenario.id)")
         do {
             switch scenario.source {
-            case .tag(let url): try await session.load(tag: url)
+            case .tag(let url): try await session.load(tag: DemoCatalog.requestReady(url))
             case .xml(let xml): try await session.load(xml: xml)
             }
         } catch VASTAdSession.SessionError.stopped {

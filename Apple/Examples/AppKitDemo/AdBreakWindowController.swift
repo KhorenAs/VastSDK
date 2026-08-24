@@ -68,7 +68,7 @@ final class AdBreakWindowController: NSWindowController {
             guard !Task.isCancelled else { return }
             do {
                 switch scenario.source {
-                case .tag(let url): try await session.load(tag: url)
+                case .tag(let url): try await session.load(tag: DemoCatalog.requestReady(url))
                 case .xml(let xml): try await session.load(xml: xml)
                 }
                 await session.play()
