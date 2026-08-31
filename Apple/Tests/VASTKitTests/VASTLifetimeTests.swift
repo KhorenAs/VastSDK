@@ -26,8 +26,8 @@ final class VASTLifetimeTests: XCTestCase {
             XCTAssertNotNil(weakSession)
         }
 
-        XCTAssertNil(weakSession, "the session outlived its owner")
-        XCTAssertNil(weakPlayer, "the session is keeping the player alive")
+        assertReleased(weakSession, "the session outlived its owner")
+        assertReleased(weakPlayer, "the session is keeping the player alive")
     }
 
     /// `attach(to:)` puts a view holding the session into a container. If the
@@ -43,7 +43,7 @@ final class VASTLifetimeTests: XCTestCase {
             session.detach()
         }
 
-        XCTAssertNil(weakSession)
+        assertReleased(weakSession)
     }
 
     /// The same, without the host remembering to detach. A container that is
@@ -62,8 +62,8 @@ final class VASTLifetimeTests: XCTestCase {
             XCTAssertNotNil(weakSurface, "attach should have added the surface")
         }
 
-        XCTAssertNil(weakSurface, "the surface outlived its container")
-        XCTAssertNil(weakSession, "session ⇄ surface reference cycle")
+        assertReleased(weakSurface, "the surface outlived its container")
+        assertReleased(weakSession, "session ⇄ surface reference cycle")
     }
 
     /// `stop()` is what a screen calls on the way out, so it has to leave nothing
@@ -79,7 +79,7 @@ final class VASTLifetimeTests: XCTestCase {
             session.stop()
         }
 
-        XCTAssertNil(weakSession)
+        assertReleased(weakSession)
     }
 }
 
@@ -134,8 +134,8 @@ extension VASTLifetimeTests {
         // Let the break's own task finish releasing its captures.
         try? await Task.sleep(nanoseconds: 200_000_000)
 
-        XCTAssertNil(weakSession, "something registered during the break still holds the session")
-        XCTAssertNil(weakPlayer, "the player is still retained after the break")
+        assertReleased(weakSession, "something registered during the break still holds the session")
+        assertReleased(weakPlayer, "the player is still retained after the break")
     }
 
     /// The clock installs the observer that drives everything; if it survives, so
@@ -152,7 +152,7 @@ extension VASTLifetimeTests {
             clock.stop()
         }
 
-        XCTAssertNil(weakClock)
+        assertReleased(weakClock)
     }
 }
 
@@ -206,8 +206,8 @@ extension VASTLifetimeTests {
 
         try? await Task.sleep(nanoseconds: 500_000_000)
 
-        XCTAssertNil(weakSession, "session ⇄ activeBreak reference cycle")
-        XCTAssertNil(weakPlayer, "the player outlived the session that owned it")
+        assertReleased(weakSession, "session ⇄ activeBreak reference cycle")
+        assertReleased(weakPlayer, "the player outlived the session that owned it")
     }
 
     /// Repeated enter/leave, each time abandoning the break. Every player has to
@@ -292,7 +292,40 @@ extension VASTLifetimeTests {
         // its task to finish. If the cycle is present, finishing changes nothing.
         try? await Task.sleep(nanoseconds: 10_000_000_000)
 
-        XCTAssertNil(weakSession, "session ⇄ activeBreak cycle survives an abandoned break")
-        XCTAssertNil(weakPlayer)
+        assertReleased(weakSession, "session ⇄ activeBreak cycle survives an abandoned break")
+        assertReleased(weakPlayer)
+    }
+}
+
+// MARK: - Waiting for a release
+
+extension VASTLifetimeTests {
+
+    /// Asserts a weak reference clears, allowing for a release that is late
+    /// rather than absent.
+    ///
+    /// Waiting cannot hide a leak: a leaked object never clears, so the deadline
+    /// expires and the assertion fails exactly as before. What waiting does allow
+    /// for is AVFoundation's own timing — an `AVPlayer` stays briefly retained by
+    /// machinery on its own queues after the last reference goes, and the plain
+    /// assertion failed roughly one run in eight because of it. Always on the
+    /// player, never on anything this SDK owns.
+    ///
+    /// `@autoclosure` rather than a value: the point is to read the weak
+    /// reference again on every turn, not once before the wait.
+    func assertReleased(
+        _ reference: @escaping @autoclosure () -> AnyObject?,
+        _ message: String = "",
+        timeout: TimeInterval = 2,
+        file: StaticString = #filePath,
+        line: UInt = #line
+    ) {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while reference() != nil, ProcessInfo.processInfo.systemUptime < deadline {
+            // Draining the run loop is the whole mechanism: pending releases and
+            // autorelease pools on this thread need a turn in which to happen.
+            RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.02))
+        }
+        XCTAssertNil(reference(), message, file: file, line: line)
     }
 }
