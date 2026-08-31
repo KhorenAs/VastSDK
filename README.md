@@ -12,6 +12,9 @@ Each platform is a self-contained project with its own build and its own tests.
 They share the specification, the test fixtures and the behavioural decisions —
 not code.
 
+[GO-LIVE.md](GO-LIVE.md) lists what the Apple SDK still needs before it serves
+real ads, ordered by what blocks the road rather than by effort.
+
 ## Apple
 
 ```swift
