@@ -167,6 +167,42 @@ final class VASTAdSurfaceTests: XCTestCase {
         XCTAssertGreaterThan(centre.blue, centre.red, "the surface must not be buried by sibling order")
     }
 
+    // MARK: - Host-supplied views
+
+    /// A replaced control has to be able to change.
+    ///
+    /// `makeUIView`/`makeNSView` run once per view identity, so handing the
+    /// builder's view straight back froze whatever the first call produced — a
+    /// countdown that never counted, and a skip control stuck on the hourglass it
+    /// was born with, long after the offset had elapsed. This is the container
+    /// that gives `update` something to change.
+    func testAReplacedControlIsSwappedRatherThanFrozen() {
+        let container = SwapContainer()
+
+        let first = PlatformView()
+        container.host(first)
+        XCTAssertEqual(container.subviews.count, 1)
+        XCTAssertTrue(container.subviews.first === first)
+
+        let second = PlatformView()
+        container.host(second)
+        XCTAssertEqual(container.subviews.count, 1, "the first control was left behind")
+        XCTAssertTrue(container.subviews.first === second, "the control never changed")
+    }
+
+    /// Handed the same view again there is nothing to do, and tearing it down and
+    /// putting it back would drop its state — and its constraints — every redraw.
+    func testHostingTheSameControlTwiceIsANoOp() {
+        let container = SwapContainer()
+        let view = PlatformView()
+
+        container.host(view)
+        container.host(view)
+
+        XCTAssertEqual(container.subviews.count, 1)
+        XCTAssertTrue(container.subviews.first === view)
+    }
+
     private static func centrePixel(of image: CGImage) -> (red: Double, blue: Double)? {
         var pixel = [UInt8](repeating: 0, count: 4)
         guard let context = CGContext(

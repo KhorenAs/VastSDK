@@ -34,6 +34,32 @@ public final class VASTAdSession: ObservableObject {
     /// Seconds until the skip control unlocks; `nil` when the ad is not skippable.
     @Published public internal(set) var timeUntilSkip: TimeInterval?
 
+    /// Whether the host is willing to draw the whole ad UI itself when a
+    /// response asks it to.
+    ///
+    /// `false`, the default, means the SDK draws its own UI whatever the response
+    /// says. That is deliberate: `<Extensions>` is vendor territory, and a
+    /// vendor key must not be able to take the §2.3 skip promise away from a host
+    /// that never agreed to honour it.
+    ///
+    /// Set it to `true` and the SDK reads the `uiSettings` UI-hidden key from the
+    /// response. When the key is there the SDK draws nothing at all — no badge,
+    /// no countdown, no click layer and no skip control — and the entire ad UI
+    /// becomes yours. Pair it with `skipPresentation = .host`, which is the
+    /// statement that you accept that obligation; leaving it at `.sdk` is
+    /// reported through the delegate, because the control the SDK promised is
+    /// then on nobody's screen.
+    ///
+    /// `suppressesAdUI` is the answer for the ad currently playing.
+    @Published public var isHiddenUi = false
+
+    /// Whether the ad on screen right now must be drawn by the host: the host
+    /// allowed it *and* this response asked for it.
+    public var suppressesAdUI: Bool {
+        guard isHiddenUi, let ad = currentAd else { return false }
+        return ad.isUIHidden
+    }
+
     public weak var delegate: (any iVASTAdSessionDelegate)?
 
     /// Third-party measurement, if anything is going to execute the ad's
@@ -60,7 +86,7 @@ public final class VASTAdSession: ObservableObject {
     /// The engine for the ad on screen. Held here because `skip()` arrives from
     /// the host on a different call than the tick loop that owns playback.
     var activeEngine: VASTTrackingEngine?
-    var activeClock: VASTPlayerClock?
+    var activeClock: (any iVASTClock)?
     var skipRequested = false
     /// The break currently running, if any.
     ///
@@ -166,11 +192,30 @@ public final class VASTAdSession: ObservableObject {
         #endif
     }
 
+    /// The ad UI is being suppressed at the response's request, but the host
+    /// never took the skip control over. Reported rather than refused: unlike
+    /// `skipPresentation = .unsupported`, the host did opt in here — it just
+    /// opted in to half of what that means.
+    func verifyHostDrawnUI(for ad: VASTAd) {
+        guard suppressesAdUI, ad.isSkippable, configuration.skipPresentation == .sdk else { return }
+        let reason = """
+        the response asked for host-drawn UI and isHiddenUi permits it, so the SDK \
+        is drawing nothing — but skipPresentation is still .sdk, which promised \
+        this skippable ad a control. Set skipPresentation to .host and draw one, \
+        or leave isHiddenUi false for this break.
+        """
+        print("[VASTKit] skip control unavailable: \(reason)")
+        delegate?.session(self, skipControlUnavailableFor: ad, reason: reason)
+    }
+
     /// Checks the one compliance promise the SDK cannot verify on its own, at the
     /// moment it actually matters: the control is due, so it had better be
     /// somewhere a viewer can reach.
     func verifySkipSurface(for ad: VASTAd) {
         guard configuration.skipPresentation == .sdk, ad.isSkippable else { return }
+        // Already reported at the start of the ad, and no control was drawn to
+        // measure — complaining again when the offset elapses says nothing new.
+        guard !suppressesAdUI else { return }
         // `attach(to:)` means the SDK owns the surface and pinned it itself.
         guard attachedSurface == nil else { return }
         guard let diagnosis = surfacePresence.diagnosis else { return }
@@ -333,6 +378,46 @@ public final class VASTAdSession: ObservableObject {
         }
         // Ending the tick stream lets the pod loop advance to the next ad.
         activeClock?.stop()
+    }
+
+    /// Pauses the ad on screen and reports it (§3.14.1 player operation metrics).
+    ///
+    /// Pause has to come through here rather than through the `AVPlayer`. The
+    /// session re-issues playback on every tick so that an ad survives the system
+    /// stopping it — iOS leaves `rate` at 0 after backgrounding and never resumes
+    /// — and it cannot tell that apart from a host pausing behind its back, so a
+    /// pause made on the player is undone within one tick and reported to nobody.
+    ///
+    /// Does nothing unless an ad is playing.
+    public func pause() {
+        guard state == .playing, let playback = activePlayback else { return }
+        playback.pauseByUser()
+        report(.pause)
+        state = .paused
+    }
+
+    /// Resumes an ad paused by `pause()`, and reports that too.
+    ///
+    /// Does nothing unless the session is paused; in particular it will not
+    /// override a pause the *system* imposed, which lifts on its own.
+    public func resume() {
+        guard state == .paused, let playback = activePlayback else { return }
+        playback.resumeByUser()
+        report(.resume)
+        state = .playing
+    }
+
+    /// Reports an event the SDK cannot observe for itself — mute, fullscreen and
+    /// the rest of §3.14.1's player operation metrics.
+    ///
+    /// Quartiles, `start` and `complete` are derived from observed playback and
+    /// are refused here, so a host cannot fabricate a billable event. Reporting
+    /// an event no `<Tracking>` element asked for is free and does nothing.
+    public func report(_ event: VASTAd.TrackingEvent) {
+        guard var engine = activeEngine else { return }
+        let beacons = engine.report(event)
+        activeEngine = engine
+        send(beacons)
     }
 
     /// Abandons the break and hands the player back to the host.

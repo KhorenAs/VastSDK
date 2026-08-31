@@ -40,6 +40,16 @@ final class VASTPlaybackController {
     /// True while the app is not frontmost, or audio is interrupted. The stall
     /// watchdog is suspended for that time: a backgrounded ad is not a broken one.
     private(set) var isSuspendedBySystem = false
+    /// True while the host has paused the ad through `VASTAdSession.pause()`.
+    ///
+    /// `resumeIfNeeded()` re-issues playback on every tick because iOS leaves
+    /// `rate` at 0 after backgrounding and never restarts on its own. From the
+    /// player alone that is indistinguishable from someone deliberately pausing,
+    /// so an ad the host paused was resumed within one tick — the viewer could
+    /// not pause an ad at all. The difference is not observable; it has to be
+    /// stated, which is why pausing goes through the session.
+    private(set) var isPausedByUser = false
+
     /// Set when the break is being abandoned. Everything in flight has to notice:
     /// a `begin` still waiting for its creative would otherwise finish, call
     /// `play()`, and put an ad back on a player the host has already moved on from.
@@ -183,8 +193,21 @@ final class VASTPlaybackController {
 
     /// Restarts playback if the ad should be running and nothing else stopped it.
     func resumeIfNeeded() {
-        guard wantsPlayback, !isAborted, !isSuspendedBySystem, player.rate == 0 else { return }
+        guard wantsPlayback, !isAborted, !isSuspendedBySystem, !isPausedByUser,
+              player.rate == 0
+        else { return }
         player.play()
+    }
+
+    /// Holds the ad where it is until `resumeByUser()`.
+    func pauseByUser() {
+        isPausedByUser = true
+        player.pause()
+    }
+
+    func resumeByUser() {
+        isPausedByUser = false
+        resumeIfNeeded()
     }
 
     /// Abandons the break immediately: stop asking for playback, stop the sound,

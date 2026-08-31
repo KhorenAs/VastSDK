@@ -108,7 +108,10 @@ struct DemoSkipButton: View {
         }
         .font(.caption.weight(.bold))
         .padding(.horizontal, 14)
-        .padding(.vertical, 8)
+        // 44pt is `VASTSurfacePresence.minimumUsableEdge`, and the SDK reports a
+        // control drawn smaller than that — correctly: this one was 50×31, below
+        // the platform's own minimum hit target.
+        .frame(minWidth: 44, minHeight: 44)
         .background(secondsUntilUnlock == nil ? .yellow : .black.opacity(0.55), in: Capsule())
     }
 }

@@ -143,12 +143,16 @@ extension VASTAdSession {
 
         state = .playing
         verifyClickPath(for: ad)
+        verifyHostDrawnUI(for: ad)
         // Before the impression: a measurement session has to exist for the
         // impression it is being asked to attest to.
         measurement?.begin(VASTMeasurementContext(ad: ad, adView: attachedSurface))
         delegate?.session(self, didStart: ad, at: adPosition)
 
-        let clock = VASTPlayerClock(player: player, adItem: item)
+        // A host with its own playback-time accounting — or a test with a
+        // scripted sequence — supplies the clock; the built-in one is what binds
+        // to the item just created, which is why it cannot be built any earlier.
+        let clock = configuration.clock ?? VASTPlayerClock(player: player, adItem: item)
         self.activeClock = clock
         self.activeEngine = engine
         defer { activeClock = nil; activeEngine = nil }
@@ -198,9 +202,11 @@ extension VASTAdSession {
             if tick.adTime > lastPosition + 0.01 {
                 lastPosition = tick.adTime
                 lastAdvance = tick.wallClock
-            } else if playback.isSuspendedBySystem {
-                // Backgrounded or audio-interrupted: the playhead is meant to be
-                // still, so the clock for "stuck" does not run.
+            } else if playback.isSuspendedBySystem || playback.isPausedByUser {
+                // Backgrounded, audio-interrupted, or paused by the host: the
+                // playhead is meant to be still, so the clock for "stuck" does
+                // not run. Without the pause case a viewer who paused for longer
+                // than `stallTimeout` had the ad written off as unplayable.
                 lastAdvance = tick.wallClock
             } else if playback.wantsPlayback,
                       tick.wallClock - lastAdvance > Self.stallTimeout {

@@ -82,7 +82,11 @@ public struct VASTAdSurface: View {
     }
 
     private var isShowingAd: Bool {
-        switch session.state {
+        // The response asked for host-drawn UI and the host allowed it, so this
+        // surface draws nothing and takes no taps — the host's own controls are
+        // the only ones there.
+        guard !session.suppressesAdUI else { return false }
+        return switch session.state {
         case .playing, .paused: session.currentAd != nil
         case .idle, .loading, .finished: false
         }

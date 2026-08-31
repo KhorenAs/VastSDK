@@ -64,7 +64,16 @@ final class AdBreakScreen: ObservableObject {
         self.scenario = scenario
         let player = AVPlayer(url: DemoCatalog.contentStream)
         self.player = player
-        self.session = VASTAdSession(player: player)
+        // A scenario that hands the ad UI to the host hands it the §2.3 skip
+        // obligation too, so the two settings travel together and no screen can
+        // opt into half of it.
+        self.session = VASTAdSession(
+            player: player,
+            configuration: VASTAdSession.Configuration(
+                skipPresentation: scenario.hostDrawsUI ? .host : .sdk
+            )
+        )
+        self.session.isHiddenUi = scenario.hostDrawsUI
         self.content = ContentPlayerModel(player: player)
 
         LiveCount.shared.adjust(1)

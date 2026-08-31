@@ -71,6 +71,7 @@ struct PlayerView: View {
                     .vastClickThrough { url in
                         screen.note(ClickThrough.open(url))
                     }
+                hostDrawnSkip
             }
             .background(.black)
 
@@ -95,6 +96,33 @@ struct PlayerView: View {
         #endif
         .task { await screen.start() }
         .onDisappear { screen.invalidate() }
+    }
+
+    /// The control this screen owes the viewer when the response asked the player
+    /// to draw nothing and `isHiddenUi` allowed it. The SDK draws no skip in that
+    /// case — by design — so §2.3 is honoured here or not at all.
+    @ViewBuilder
+    private var hostDrawnSkip: some View {
+        if screen.session.suppressesAdUI, screen.isPlayingAd {
+            VStack {
+                Spacer()
+                HStack {
+                    Spacer()
+                    Button {
+                        try? screen.session.skip()
+                    } label: {
+                        DemoSkipButton(
+                            secondsUntilUnlock: screen.session.canSkip
+                                ? nil
+                                : screen.session.timeUntilSkip
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(!screen.session.canSkip)
+                }
+            }
+            .padding()
+        }
     }
 
     /// The scenario's own title, drawn in the page rather than left to the

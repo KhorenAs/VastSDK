@@ -22,6 +22,12 @@ struct DemoScenario: Identifiable, Hashable {
     let title: String
     let detail: String
     let source: Source
+    /// The screen takes the whole ad UI over, and with it the §2.3 skip
+    /// obligation: it sets `isHiddenUi` and `skipPresentation = .host`.
+    ///
+    /// Per scenario rather than per app, so one list can show both halves of the
+    /// rule — the same response hides nothing on a screen that never opted in.
+    var hostDrawsUI: Bool = false
 }
 
 enum DemoCatalog {
@@ -96,6 +102,13 @@ enum DemoCatalog {
             title: "No fill",
             detail: "Empty response. The session reports VAST error 303 promptly.",
             source: .xml(DemoVAST.noAd)
+        ),
+        DemoScenario(
+            id: "host-ui",
+            title: "Custom UI — uiSettings",
+            detail: "Response asks the player to draw nothing. This screen draws its own skip.",
+            source: .xml(DemoVAST.inLine(skipOffset: "00:00:05", id: "demo-hostui")),
+            hostDrawsUI: true
         ),
         DemoScenario(
             id: "bad-media",
