@@ -28,9 +28,8 @@ final class AdBreakViewController: UIViewController {
 
     private let screen: AdBreakScreen
     private let playerView = PlayerHostView()
-    /// Built directly rather than through `session.attach(to:)`, because the
-    /// styling hooks live on the view and `attach` does not hand it back.
-    private lazy var adSurface = VASTAdSurfaceView(session: screen.session)
+    /// Handed back by `attach(to:)`, which is also what keeps it front-most.
+    private var adSurface: VASTAdSurfaceView?
 
     private var cancellables: Set<AnyCancellable> = []
     private var breakTask: Task<Void, Never>?
@@ -112,6 +111,15 @@ final class AdBreakViewController: UIViewController {
 
     // MARK: - Layout
 
+    /// Smaller on tvOS, where the player needs every point it can get.
+    private static var logHeight: CGFloat {
+        #if os(tvOS)
+        100
+        #else
+        160
+        #endif
+    }
+
     private func buildLayout() {
         titleLabel.text = screen.scenario.title
         titleLabel.font = .preferredFont(forTextStyle: .headline)
@@ -129,18 +137,19 @@ final class AdBreakViewController: UIViewController {
 
         playerView.attach(player: screen.player, gravity: .resizeAspect)
         playerView.translatesAutoresizingMaskIntoConstraints = false
-        playerView.addSubview(adSurface)
-        adSurface.translatesAutoresizingMaskIntoConstraints = false
         // The SDK owns the behaviour §2.3 and §3.10.1 require; the look is ours.
-        adSurface.skipButtonBuilder = { remaining in
+        let surface = screen.session.attach(to: playerView)
+        surface.skipButtonBuilder = { remaining in
             let pill = SkipPill()
             pill.secondsUntilUnlock = remaining
             return pill
         }
-        adSurface.clickThroughHandler = { [weak self] url in
+        surface.clickThroughHandler = { [weak self] url in
             self?.screen.note(ClickThrough.open(url))
         }
+        adSurface = surface
         playerView.addSubview(hostSkip)
+        playerView.bringSubviewToFront(hostSkip)
         hostSkip.translatesAutoresizingMaskIntoConstraints = false
 
         buildTransport()
@@ -193,20 +202,22 @@ final class AdBreakViewController: UIViewController {
             column.trailingAnchor.constraint(equalTo: view.trailingAnchor),
             column.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor),
 
-            playerView.heightAnchor.constraint(equalTo: playerView.widthAnchor, multiplier: 9.0 / 16.0),
-
-            adSurface.topAnchor.constraint(equalTo: playerView.topAnchor),
-            adSurface.bottomAnchor.constraint(equalTo: playerView.bottomAnchor),
-            adSurface.leadingAnchor.constraint(equalTo: playerView.leadingAnchor),
-            adSurface.trailingAnchor.constraint(equalTo: playerView.trailingAnchor),
-
             hostSkip.trailingAnchor.constraint(equalTo: playerView.trailingAnchor, constant: -16),
             hostSkip.bottomAnchor.constraint(equalTo: playerView.bottomAnchor, constant: -16),
 
             divider.heightAnchor.constraint(equalToConstant: 1),
             adNotice.heightAnchor.constraint(equalToConstant: 62),
-            logView.heightAnchor.constraint(greaterThanOrEqualToConstant: 160),
+            logView.heightAnchor.constraint(greaterThanOrEqualToConstant: Self.logHeight),
         ])
+
+        // 16:9 wanted 1012pt of a 1080pt screen on tvOS, which the rest of the
+        // column cannot spare. Below `required` the ratio gives way instead of
+        // fighting the column's own height, and holds exactly where it fits.
+        let aspect = playerView.heightAnchor.constraint(
+            equalTo: playerView.widthAnchor, multiplier: 9.0 / 16.0
+        )
+        aspect.priority = .defaultHigh
+        aspect.isActive = true
     }
 
     /// The content transport, and the notice that replaces it. Hidden rather than
@@ -538,7 +549,10 @@ final class SkipPill: UIControl {
             icon.image = UIImage(systemName: "forward.end.fill")
             icon.tintColor = .black
             label.textColor = .black
-            label.text = "Skip"
+            // The host's own copy, in the host's own language — which is what
+            // `skipButtonBuilder` is for. The SDK's default control is localised
+            // separately, and a host replacing it takes that over too.
+            label.text = "Բաց թողնել"
             isEnabled = true
         }
     }

@@ -85,6 +85,11 @@ public struct VASTMediaFileSelector: Sendable {
             score += 0.5
         }
 
+        // App Transport Security refuses plain http, and a response offering both
+        // renditions would otherwise have the http one chosen and then fail as a
+        // media error. Small, so it only decides between otherwise equal files.
+        if file.url.scheme?.lowercased() != "https" { score += 0.25 }
+
         if let ceiling = capabilities.preferredBitrate, let bitrate = effectiveBitrate(file) {
             let ratio = Double(bitrate) / Double(max(ceiling, 1))
             score += ratio > 1 ? (ratio - 1) : 0

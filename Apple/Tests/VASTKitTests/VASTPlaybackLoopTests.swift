@@ -44,7 +44,9 @@ final class VASTPlaybackLoopTests: XCTestCase {
             Self.tick(at: 5, wall: 5),
             Self.tick(at: 10, wall: 10),
             Self.tick(at: 15, wall: 15),
-            Self.tick(at: 19.5, wall: 19.5),
+            // Within one tick of the end, which is what a player reports when a
+            // creative plays out.
+            Self.tick(at: 19.9, wall: 19.9),
         ])
         let session = makeSession(clock: clock, transport: transport)
 
@@ -126,7 +128,7 @@ final class VASTPlaybackLoopTests: XCTestCase {
             // Resumed, and the rest of the creative plays out.
             Self.tick(at: 3, wall: 21),
             Self.tick(at: 10, wall: 28),
-            Self.tick(at: 19.5, wall: 37.5),
+            Self.tick(at: 19.9, wall: 37.9),
         ]) { index in
             guard let session = probe.session else { return }
             switch index {

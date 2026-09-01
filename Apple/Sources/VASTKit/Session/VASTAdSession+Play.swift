@@ -141,6 +141,10 @@ extension VASTAdSession {
             return .failed(.mediaFileTimeout)
         }
 
+        // Before the impression: the creative is ready, which is what `loaded`
+        // means, and it happens whether or not the ad is ever seen.
+        send(engine.creativeDidLoad())
+
         state = .playing
         verifyClickPath(for: ad)
         verifyHostDrawnUI(for: ad)

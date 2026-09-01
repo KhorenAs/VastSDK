@@ -1,0 +1,14 @@
+/* The badge shown while an ad is on screen, when the break holds one ad. */
+"ad.badge" = "Ad";
+
+/* The same badge in a pod: position, then how many ads the break holds. */
+"ad.badge.pod" = "Ad %lld/%lld";
+
+/* Time left in the creative. Kept short: it sits beside the badge. */
+"ad.countdown" = "%llds";
+
+/* The skip control, once `skipoffset` has elapsed. */
+"skip.action" = "Skip Ad  ›";
+
+/* The skip control before it unlocks: seconds remaining. */
+"skip.countdown" = "Skip in %lld";

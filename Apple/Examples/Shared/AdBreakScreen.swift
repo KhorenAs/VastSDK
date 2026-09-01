@@ -70,7 +70,13 @@ final class AdBreakScreen: ObservableObject {
         self.session = VASTAdSession(
             player: player,
             configuration: VASTAdSession.Configuration(
-                skipPresentation: scenario.hostDrawsUI ? .host : .sdk
+                skipPresentation: scenario.hostDrawsUI ? .host : .sdk,
+                // tvOS has no pointer, and a transparent layer takes no focus, so
+                // `.surface` cannot work there — the SDK says so through the
+                // delegate rather than drawing something inert. A real tvOS host
+                // uses `.host` with a focusable control of its own; a demo with no
+                // such control opts out knowingly instead of pretending.
+                clickPresentation: Self.clickPresentation
             )
         )
         self.session.isHiddenUi = scenario.hostDrawsUI
@@ -93,6 +99,15 @@ final class AdBreakScreen: ObservableObject {
         // Nothing should be left holding the player after this; releasing it is
         // what actually stops the sound.
         player.replaceCurrentItem(with: nil)
+    }
+
+    /// Where a click can come from on this platform.
+    static var clickPresentation: VASTAdSession.ClickPresentation {
+        #if os(tvOS)
+        .disabled
+        #else
+        .surface
+        #endif
     }
 
     var isPlayingAd: Bool {

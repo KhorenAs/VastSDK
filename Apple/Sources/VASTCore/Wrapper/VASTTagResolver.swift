@@ -38,7 +38,34 @@ public struct VASTTagResolver: Sendable {
 
     /// Resolves a tag URL, following Wrappers until an InLine response.
     public func resolve(tag url: URL) async throws -> Resolution {
+        try await follow(url, chain: VASTWrapperChain(maxDepth: maxDepth))
+    }
+
+    /// Resolves a document already in hand. Wrappers inside it are still
+    /// followed, so a caller holding XML gets the same behaviour as `resolve(tag:)`.
+    public func resolve(xml: String, baseURL: URL? = nil) async throws -> Resolution {
         var chain = VASTWrapperChain(maxDepth: maxDepth)
+        switch try step(xml, from: baseURL, chain: &chain) {
+        case .resolved(let ads):
+            return Resolution(ads: ads, chain: chain)
+        case .failed(let error):
+            throw Failure(error: error, beacons: chain.errorBeacons(for: error))
+        case .follow(let url):
+            // The chain carries on rather than starting again. Handing the tail a
+            // fresh one dropped this document's own `<Impression>` and `<Error>`
+            // URIs, restarted the depth count — making the effective limit twice
+            // `maxDepth` — and lost its `allowMultipleAds` constraint.
+            return try await follow(url, chain: chain)
+        }
+    }
+
+    /// Walks the redirect chain from `url`, carrying what has been collected.
+    ///
+    /// Takes the chain by value and returns the result rather than mutating in
+    /// place: `inout` cannot cross an `await`, and the chain is a value type
+    /// precisely so that this is not a problem.
+    private func follow(_ url: URL, chain: VASTWrapperChain) async throws -> Resolution {
+        var chain = chain
         var next = url
 
         while true {
@@ -59,21 +86,6 @@ public struct VASTTagResolver: Sendable {
             case .failed(let error):
                 throw Failure(error: error, beacons: chain.errorBeacons(for: error))
             }
-        }
-    }
-
-    /// Resolves a document already in hand. Wrappers inside it are still
-    /// followed, so a caller holding XML gets the same behaviour as `resolve(tag:)`.
-    public func resolve(xml: String, baseURL: URL? = nil) async throws -> Resolution {
-        var chain = VASTWrapperChain(maxDepth: maxDepth)
-        switch try step(xml, from: baseURL, chain: &chain) {
-        case .resolved(let ads):
-            return Resolution(ads: ads, chain: chain)
-        case .failed(let error):
-            throw Failure(error: error, beacons: chain.errorBeacons(for: error))
-        case .follow(let url):
-            let tail = try await resolve(tag: url)
-            return Resolution(ads: tail.ads, chain: tail.chain)
         }
     }
 

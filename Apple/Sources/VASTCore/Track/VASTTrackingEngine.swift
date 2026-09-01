@@ -21,6 +21,25 @@ public struct VASTTrackingEngine: Sendable {
     /// second, and the last tick rarely lands exactly on the final frame.
     public static let completionThreshold = 0.97
 
+    /// How close to the end, in seconds, the engine will call the creative
+    /// finished *by itself*, with no word from the player.
+    ///
+    /// A margin rather than a fraction, because the gap that matters is one tick
+    /// and a tick is a fixed 200ms whether the creative runs ten seconds or
+    /// sixty. Holding a ratio constant instead held the wrong quantity constant:
+    /// the same 0.97 stopped a thirty-second ad with nearly a second unplayed —
+    /// usually where the logo is — and a ten-second one with a third of that.
+    ///
+    /// Tightening the ratio instead would have been worse than either. At 200ms
+    /// per tick no ad ever reaches 0.995 coverage, so every break would have hung
+    /// on the player's end-of-item signal, and any break that missed it would
+    /// have sat on its last frame until the stall watchdog noticed.
+    ///
+    /// `completionThreshold` is a different question and keeps its own value: it
+    /// asks whether enough of the creative was *watched*, which is what a
+    /// declared `<Duration>` disagreeing with the real media was always about.
+    public static let selfCompletionMargin: TimeInterval = 0.25
+
     private let ad: VASTAd
     /// Starts from `<Duration>` and is replaced by the player's own figure as
     /// soon as one is available: the declared value is advisory, and quartiles
@@ -91,10 +110,21 @@ public struct VASTTrackingEngine: Sendable {
         beacons += quartileBeacons()
         beacons += progressBeacons()
 
-        if watched >= duration * Self.completionThreshold {
+        if duration > 0, watched >= duration - Self.selfCompletionMargin {
             beacons += finish()
         }
         return beacons
+    }
+
+    /// The creative is ready and playback is about to begin (§3.14.1 `loaded`).
+    ///
+    /// Not host-reportable, and not derivable from a tick either — readiness is
+    /// something only whoever loaded the media knows. Without this the event
+    /// could not be sent by anyone, which is why every `<Tracking event="loaded">`
+    /// in every response went unanswered.
+    public mutating func creativeDidLoad() -> [VASTBeacon] {
+        guard !isFinished else { return [] }
+        return fire(.loaded)
     }
 
     /// The player reported that the item played to its end.
@@ -117,8 +147,17 @@ public struct VASTTrackingEngine: Sendable {
     }
 
     /// Playback stopped advancing and is not going to resume.
+    ///
+    /// A creative that stalls *after* being watched through is finished, not
+    /// broken. Reporting 402 for its last few frames would tell the ad server a
+    /// delivered impression had failed — and with the engine no longer ending the
+    /// ad at 97%, the end of a creative is exactly where a final stall now lands.
     public mutating func playbackDidStall() -> [VASTBeacon] {
-        fail(.mediaFileTimeout)
+        guard !isFinished else { return [] }
+        if duration > 0, watched >= duration * Self.completionThreshold {
+            return playbackDidReachEnd()
+        }
+        return fail(.mediaFileTimeout)
     }
 
     public mutating func userDidSkip() -> [VASTBeacon] {

@@ -282,6 +282,58 @@ extension VASTTrackingEngineTests {
         XCTAssertEqual(engine.duration, 24.04, accuracy: 0.001)
     }
 
+    // MARK: - The end of the creative
+
+    /// What the engine cuts off the end of a creative is bounded by one tick, not
+    /// by a fraction of the running time.
+    ///
+    /// As a ratio the same figure took nearly a second off a thirty-second ad and
+    /// a third of that off a ten-second one — the wrong quantity to hold
+    /// constant, and the longer the creative the more of its ending was lost.
+    func testTheCutAtTheEndIsWithinOneTickWhateverTheDuration() {
+        let interval = 0.2
+
+        for duration in [10.0, 30.0, 60.0] {
+            var engine = VASTTrackingEngine(ad: makeAd(duration: duration), duration: duration)
+            var completedAt: TimeInterval?
+            var time = 0.0
+
+            while time <= duration, completedAt == nil {
+                let fired = engine.advance(to: VASTTick(
+                    adTime: time, duration: duration, rate: 1, wallClock: time
+                )).map(\.label)
+                if fired.contains("complete") { completedAt = time }
+                time += interval
+            }
+
+            let completed = try? XCTUnwrap(completedAt)
+            XCTAssertNotNil(completed, "a \(Int(duration))s creative never completed")
+            XCTAssertLessThanOrEqual(
+                duration - (completed ?? 0), interval + 0.001,
+                "a \(Int(duration))s creative lost more than one tick of its ending"
+            )
+        }
+    }
+
+    /// A creative that stalls *after* being watched through is finished, not
+    /// broken. Reporting 402 for its last frames would tell the ad server that a
+    /// delivered impression had failed.
+    func testAStallPastTheWatchedThresholdCompletesRatherThanFailing() {
+        var engine = VASTTrackingEngine(ad: makeAd(duration: 30), duration: 30)
+        _ = engine.advance(to: tick(0, 0))
+        for second in 1...29 {
+            _ = engine.advance(to: tick(Double(second), Double(second)))
+        }
+        // Past `completionThreshold`, short of the margin the engine finishes on.
+        _ = engine.advance(to: tick(29.5, 29.5))
+        XCTAssertFalse(engine.isFinished)
+
+        let beacons = engine.playbackDidStall().map(\.label)
+        XCTAssertTrue(beacons.contains("complete"), "29.5 of 30 seconds is a watched creative")
+        XCTAssertFalse(beacons.contains("error 402"))
+        XCTAssertTrue(engine.isFinished)
+    }
+
     /// A creative that never advances is written off, and the error goes to every
     /// URI in the chain.
     func testStallReportsMediaTimeout() {

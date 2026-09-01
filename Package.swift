@@ -14,6 +14,7 @@ import PackageDescription
 
 let package = Package(
     name: "VASTSDK",
+    defaultLocalization: "en",
     platforms: [
         .iOS(.v16),
         .tvOS(.v16),
@@ -29,7 +30,11 @@ let package = Package(
         .target(name: "VASTCore", path: "Apple/Sources/VASTCore"),
 
         // Player, networking and UI binding.
-        .target(name: "VASTKit", dependencies: ["VASTCore"], path: "Apple/Sources/VASTKit"),
+        .target(name: "VASTKit", dependencies: ["VASTCore"], path: "Apple/Sources/VASTKit",
+            // The ad UI's own words, localised in the package: a host that
+            // configures nothing should not get an English skip control.
+            resources: [.process("Resources")]
+        ),
 
         // Runnable logic harness for VASTCore: `swift run Harness`.
         // Drives the tracking engine with scripted ticks — no player, no network.

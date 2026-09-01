@@ -25,9 +25,8 @@ final class AdBreakWindowController: NSWindowController {
 
     private let screen: AdBreakScreen
     private let playerView = PlayerHostView()
-    /// Built directly rather than through `session.attach(to:)`, because the
-    /// styling hooks live on the view and `attach` does not hand it back.
-    private lazy var adSurface = VASTAdSurfaceView(session: screen.session)
+    /// Handed back by `attach(to:)`, which is also what keeps it front-most.
+    private var adSurface: VASTAdSurfaceView?
 
     private var cancellables: Set<AnyCancellable> = []
     private var breakTask: Task<Void, Never>?
@@ -102,17 +101,17 @@ final class AdBreakWindowController: NSWindowController {
         header.spacing = 2
 
         playerView.attach(player: screen.player, gravity: .resizeAspect)
-        playerView.addSubview(adSurface, positioned: .above, relativeTo: nil)
-        adSurface.translatesAutoresizingMaskIntoConstraints = false
         // The SDK owns the behaviour §2.3 and §3.10.1 require; the look is ours.
-        adSurface.skipButtonBuilder = { remaining in
+        let surface = screen.session.attach(to: playerView)
+        surface.skipButtonBuilder = { remaining in
             let pill = SkipPill()
             pill.secondsUntilUnlock = remaining
             return pill
         }
-        adSurface.clickThroughHandler = { [weak self] url in
+        surface.clickThroughHandler = { [weak self] url in
             self?.screen.note(ClickThrough.open(url))
         }
+        adSurface = surface
         playerView.addSubview(hostSkip, positioned: .above, relativeTo: nil)
         hostSkip.translatesAutoresizingMaskIntoConstraints = false
 
@@ -168,11 +167,6 @@ final class AdBreakWindowController: NSWindowController {
 
             playerView.widthAnchor.constraint(equalTo: column.widthAnchor, constant: -32),
             playerView.heightAnchor.constraint(equalTo: playerView.widthAnchor, multiplier: 9.0 / 16.0),
-
-            adSurface.topAnchor.constraint(equalTo: playerView.topAnchor),
-            adSurface.bottomAnchor.constraint(equalTo: playerView.bottomAnchor),
-            adSurface.leadingAnchor.constraint(equalTo: playerView.leadingAnchor),
-            adSurface.trailingAnchor.constraint(equalTo: playerView.trailingAnchor),
 
             hostSkip.trailingAnchor.constraint(equalTo: playerView.trailingAnchor, constant: -16),
             hostSkip.bottomAnchor.constraint(equalTo: playerView.bottomAnchor, constant: -16),
@@ -484,7 +478,9 @@ final class SkipPill: NSView {
             icon.image = NSImage(systemSymbolName: "forward.end.fill", accessibilityDescription: nil)
             icon.contentTintColor = .black
             label.textColor = .black
-            label.stringValue = "Skip"
+            // The host's own copy, in the host's own language — which is what
+            // `skipButtonBuilder` is for.
+            label.stringValue = "Բաց թողնել"
         }
     }
 }

@@ -168,7 +168,7 @@ public final class VASTAdSession: ObservableObject {
               let diagnosis = surfacePresence.skipControlDiagnosis
         else { return }
         reportedSkipControlProblem = true
-        print("[VASTKit] skip control unavailable: \(diagnosis)")
+        VASTLog.compliance.warning("skip control unavailable: \(diagnosis, privacy: .public)")
         delegate?.session(self, skipControlUnavailableFor: ad, reason: diagnosis)
     }
 
@@ -187,7 +187,7 @@ public final class VASTAdSession: ObservableObject {
         clickPresentation to .host and call click() from a focusable control of \
         your own, or to .disabled to opt out knowingly.
         """
-        print("[VASTKit] click path unavailable: \(reason)")
+        VASTLog.compliance.warning("click path unavailable: \(reason, privacy: .public)")
         delegate?.session(self, clickThroughUnavailableFor: ad, reason: reason)
         #endif
     }
@@ -204,7 +204,7 @@ public final class VASTAdSession: ObservableObject {
         this skippable ad a control. Set skipPresentation to .host and draw one, \
         or leave isHiddenUi false for this break.
         """
-        print("[VASTKit] skip control unavailable: \(reason)")
+        VASTLog.compliance.warning("skip control unavailable: \(reason, privacy: .public)")
         delegate?.session(self, skipControlUnavailableFor: ad, reason: reason)
     }
 
@@ -223,7 +223,7 @@ public final class VASTAdSession: ObservableObject {
         // and a heuristic that is wrong must not take the host's app down with
         // it — which is exactly what an assertion here did the first time the
         // probe misread a surface it had in fact been given.
-        print("[VASTKit] skip control unavailable: \(diagnosis)")
+        VASTLog.compliance.warning("skip control unavailable: \(diagnosis, privacy: .public)")
         delegate?.session(self, skipControlUnavailableFor: ad, reason: diagnosis)
     }
 
@@ -298,7 +298,12 @@ public final class VASTAdSession: ObservableObject {
     /// their own `ZStack` instead — same behaviour, idiomatic placement.
     /// - Note: the surface is added last and kept front-most, which is the one
     ///   thing the SwiftUI path cannot do — there, ordering is the host's.
-    public func attach(to container: PlatformView) {
+    /// - Returns: the surface, because that is where the styling hooks live.
+    ///   Without it a UIKit host could not reach `skipButtonBuilder` and friends
+    ///   at all, and had to build the surface by hand — losing the front-most
+    ///   pinning this method exists to provide.
+    @discardableResult
+    public func attach(to container: PlatformView) -> VASTAdSurfaceView {
         detach()
         let surface = VASTAdSurfaceView(session: self)
         surface.translatesAutoresizingMaskIntoConstraints = false
@@ -321,6 +326,7 @@ public final class VASTAdSession: ObservableObject {
             surface.trailingAnchor.constraint(equalTo: container.trailingAnchor),
         ])
         attachedSurface = surface
+        return surface
     }
 
     public func detach() {

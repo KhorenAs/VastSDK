@@ -148,8 +148,8 @@ public struct VASTAdSurface: View {
             adBadge(session.adPosition)
         } else {
             Text(session.adPosition.isPod
-                 ? "Ad \(session.adPosition.index)/\(session.adPosition.total)"
-                 : "Ad")
+                 ? VASTStrings.format("ad.badge.pod", session.adPosition.index, session.adPosition.total)
+                 : VASTStrings.text("ad.badge"))
                 .padding(.horizontal, 8)
                 .padding(.vertical, 4)
                 .background(.yellow, in: RoundedRectangle(cornerRadius: 4))
@@ -162,7 +162,7 @@ public struct VASTAdSurface: View {
         if let countdown {
             countdown(session.remainingTime)
         } else {
-            Text("\(Int(session.remainingTime.rounded(.up)))s")
+            Text(VASTStrings.format("ad.countdown", Int(session.remainingTime.rounded(.up))))
         }
     }
 
@@ -183,11 +183,11 @@ public struct VASTAdSurface: View {
                     skipButton(session.canSkip ? nil : session.timeUntilSkip)
                 }
             } else if session.canSkip {
-                Button("Skip Ad  ›") { try? session.skip() }
+                Button(VASTStrings.text("skip.action")) { try? session.skip() }
                     .buttonStyle(.borderedProminent)
                     .measuredAsSkipControl(of: session)
             } else if let remaining = session.timeUntilSkip {
-                Text("Skip in \(Int(remaining.rounded(.up)))")
+                Text(VASTStrings.format("skip.countdown", Int(remaining.rounded(.up))))
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
                     .background(.black.opacity(0.6), in: Capsule())
