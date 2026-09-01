@@ -249,23 +249,54 @@ public final class VASTAdSession: ObservableObject {
     ///   `<Error>` URI collected on the way down has already been fired, as
     ///   §2.3.5.1 requires, before this throws.
     public func load(tag url: URL) async throws {
+        let resolver = resolver
         try await load { try await resolver.resolve(tag: url) }
     }
 
     /// Loads a response already in hand. `baseURL` should be supplied when known,
     /// so that a relative `VASTAdTagURI` inside it can still be followed.
     public func load(xml: String, baseURL: URL? = nil) async throws {
+        let resolver = resolver
         try await load { try await resolver.resolve(xml: xml, baseURL: baseURL) }
     }
 
-    private func load(_ resolve: () async throws -> VASTTagResolver.Resolution) async throws {
+    /// Runs `work`, giving up after `configuration.resolutionTimeout`.
+    ///
+    /// The budget is the whole response, not one hop. `wrapperTimeout` already
+    /// bounds a single fetch, and five of those in series is half a minute — long
+    /// past the point where a viewer stops believing an ad is coming.
+    ///
+    /// The error carries no `<Error>` beacons, unlike a timeout the resolver
+    /// raises itself: only the chain knows which URIs are owed, and cutting it
+    /// off from outside is exactly the case where the chain cannot say.
+    private func withResolutionBudget<T: Sendable>(
+        _ work: @escaping @Sendable () async throws -> T
+    ) async throws -> T {
+        let budget = configuration.resolutionTimeout
+        guard budget > 0 else { return try await work() }
+
+        return try await withThrowingTaskGroup(of: T.self) { group in
+            group.addTask { try await work() }
+            group.addTask {
+                try await Task.sleep(nanoseconds: UInt64(budget * 1_000_000_000))
+                throw VASTError.wrapperTimeout
+            }
+            defer { group.cancelAll() }
+            guard let first = try await group.next() else { throw VASTError.undefined }
+            return first
+        }
+    }
+
+    private func load(
+        _ resolve: @escaping @Sendable () async throws -> VASTTagResolver.Resolution
+    ) async throws {
         // Loading a new response mid-break abandons the old one rather than
         // running both; a "replay" button is otherwise a race by construction.
         await cancelActiveBreak()
         let token = generation
         state = .loading
         do {
-            let resolution = try await resolve()
+            let resolution = try await withResolutionBudget(resolve)
             guard token == generation else { throw SessionError.stopped }
             guard !resolution.ads.isEmpty else { throw VASTError.noVASTResponseAfterWrappers }
             let scheduler = VASTPodScheduler(ads: resolution.ads)
@@ -284,6 +315,12 @@ public final class VASTAdSession: ObservableObject {
         } catch let stopped as SessionError {
             // Nothing to report: the host asked for this by stopping.
             throw stopped
+        } catch let error as VASTError {
+            // The same reason the caller is about to see. Falling through to
+            // `.undefined` left `state` naming one failure and the thrown error
+            // naming another — a host reading both got two different stories.
+            state = .finished(.failed(error))
+            throw error
         } catch {
             state = .finished(.failed(.undefined))
             throw error

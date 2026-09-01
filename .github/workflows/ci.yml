@@ -1,0 +1,76 @@
+# The SDK is four builds and one test suite. All five run here, because the ones
+# that are not run are the ones that break: the tvOS demo build was broken for a
+# day before anyone tried it, and `swift test` fails outright on a machine whose
+# xcode-select points at CommandLineTools rather than a full Xcode.
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    name: Tests (macOS)
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+
+      # Printed rather than pinned: which Xcode the runner defaults to is worth
+      # seeing in the log when a failure only happens here.
+      - name: Toolchain
+        run: |
+          xcode-select -p
+          swift --version
+          xcodebuild -version
+
+      - name: swift test
+        run: swift test
+
+  library:
+    name: VASTKit (${{ matrix.platform }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [iOS, tvOS, macOS]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        working-directory: Apple
+        run: |
+          xcodebuild -scheme VASTKit \
+            -destination 'generic/platform=${{ matrix.platform }}' \
+            -derivedDataPath .build/ci \
+            build
+
+  demos:
+    name: ${{ matrix.scheme }} (${{ matrix.platform }})
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { scheme: SwiftUIDemo, platform: iOS Simulator }
+          - { scheme: SwiftUIDemo, platform: tvOS Simulator }
+          - { scheme: UIKitDemo,   platform: iOS Simulator }
+          - { scheme: UIKitDemo,   platform: tvOS Simulator }
+          - { scheme: AppKitDemo,  platform: macOS }
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        working-directory: Apple/Examples
+        # No signing identity on a runner, and none needed to prove the code
+        # compiles for the platform.
+        run: |
+          xcodebuild -project VASTDemo.xcodeproj \
+            -scheme '${{ matrix.scheme }}' \
+            -destination 'generic/platform=${{ matrix.platform }}' \
+            -derivedDataPath .build/ci \
+            CODE_SIGNING_ALLOWED=NO \
+            build

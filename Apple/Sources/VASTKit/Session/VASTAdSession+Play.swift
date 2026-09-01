@@ -118,7 +118,7 @@ extension VASTAdSession {
         do {
             file = try VASTMediaFileSelector().select(
                 from: ad.linear.mediaFiles,
-                capabilities: Self.deviceCapabilities()
+                capabilities: playbackCapabilities()
             )
         } catch {
             return fail(.noSupportedMediaFile, ad: ad, engine: &engine)
@@ -366,17 +366,45 @@ extension VASTAdSession {
         }
     }
 
-    /// The screen the creative will actually be shown on, used to rank media files.
-    private static func deviceCapabilities() -> VASTMediaFileSelector.Capabilities {
+    /// The surface the creative will actually be shown on, used to rank media
+    /// files.
+    ///
+    /// The ad surface is the player area, so asking it is asking the right thing.
+    /// The whole screen was the wrong question twice over: an inline player a
+    /// third of the screen high was handed 4K renditions it could not show and
+    /// paid for the bandwidth anyway, and under multi-window or an external
+    /// display the screen it named was not the one the ad was on.
+    ///
+    /// Falls back to the screen, because a SwiftUI host composes the surface
+    /// itself and this session may never have been handed one.
+    private func playbackCapabilities() -> VASTMediaFileSelector.Capabilities {
+        if let surface = attachedSurface, surface.bounds.width > 1, surface.bounds.height > 1 {
+            let scale = Self.surfaceScale(of: surface)
+            return VASTMediaFileSelector.Capabilities(
+                width: Int(surface.bounds.width * scale),
+                height: Int(surface.bounds.height * scale)
+            )
+        }
+        return Self.screenCapabilities()
+    }
+
+    private static func surfaceScale(of surface: VASTAdSurfaceView) -> CGFloat {
+        #if os(macOS)
+        surface.window?.backingScaleFactor ?? 2
+        #else
+        surface.window?.screen.scale ?? surface.traitCollection.displayScale
+        #endif
+    }
+
+    private static func screenCapabilities() -> VASTMediaFileSelector.Capabilities {
         #if os(macOS)
         let size = NSScreen.main?.frame.size ?? CGSize(width: 1280, height: 720)
         return VASTMediaFileSelector.Capabilities(width: Int(size.width), height: Int(size.height))
         #else
-        let bounds = UIScreen.main.bounds.size
-        let scale = UIScreen.main.scale
+        let screen = UIScreen.main
         return VASTMediaFileSelector.Capabilities(
-            width: Int(bounds.width * scale),
-            height: Int(bounds.height * scale)
+            width: Int(screen.bounds.width * screen.scale),
+            height: Int(screen.bounds.height * screen.scale)
         )
         #endif
     }

@@ -14,6 +14,11 @@ public extension VASTAdSession {
         /// VAST 4.3 §3.19.1 requires accepting at least five.
         var maxWrapperDepth: Int { get }
         var wrapperTimeout: TimeInterval { get }
+        /// Total time a response may take to resolve, however many Wrappers it
+        /// needs. `wrapperTimeout` bounds one hop, and five hops at five seconds
+        /// is twenty-five — a viewer who waited that long for an ad was shown a
+        /// bug, not an ad. Zero disables the budget.
+        var resolutionTimeout: TimeInterval { get }
         /// Restore the host's original player item when the ad break ends.
         var restoresPlayerItem: Bool { get }
         var skipPresentation: SkipPresentation { get }
@@ -58,6 +63,7 @@ public extension VASTAdSession {
 
         public var maxWrapperDepth: Int
         public var wrapperTimeout: TimeInterval
+        public var resolutionTimeout: TimeInterval
         public var restoresPlayerItem: Bool
         public var skipPresentation: SkipPresentation
         public var clickPresentation: ClickPresentation
@@ -71,6 +77,7 @@ public extension VASTAdSession {
         public init(
             maxWrapperDepth: Int = 5,
             wrapperTimeout: TimeInterval = 5,
+            resolutionTimeout: TimeInterval = 10,
             restoresPlayerItem: Bool = true,
             skipPresentation: SkipPresentation = .sdk,
             clickPresentation: ClickPresentation = .surface,
@@ -80,6 +87,7 @@ public extension VASTAdSession {
         ) {
             self.maxWrapperDepth = maxWrapperDepth
             self.wrapperTimeout = wrapperTimeout
+            self.resolutionTimeout = resolutionTimeout
             self.restoresPlayerItem = restoresPlayerItem
             self.skipPresentation = skipPresentation
             self.clickPresentation = clickPresentation
