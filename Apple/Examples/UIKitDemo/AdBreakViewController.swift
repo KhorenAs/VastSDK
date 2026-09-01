@@ -549,10 +549,9 @@ final class SkipPill: UIControl {
             icon.image = UIImage(systemName: "forward.end.fill")
             icon.tintColor = .black
             label.textColor = .black
-            // The host's own copy, in the host's own language — which is what
-            // `skipButtonBuilder` is for. The SDK's default control is localised
-            // separately, and a host replacing it takes that over too.
-            label.text = "Բաց թողնել"
+            // The host's own copy. A host replacing the control takes its
+            // wording over too — the SDK's own default is localised separately.
+            label.text = "Skip"
             isEnabled = true
         }
     }

@@ -102,8 +102,7 @@ struct DemoSkipButton: View {
                 Label("\(Int(secondsUntilUnlock.rounded(.up)))", systemImage: "hourglass")
                     .foregroundStyle(.white.opacity(0.75))
             } else {
-                // The host's own copy, in the host's own language.
-                Label("Բաց թողնել", systemImage: "forward.end.fill")
+                Label("Skip", systemImage: "forward.end.fill")
                     .foregroundStyle(.black)
             }
         }

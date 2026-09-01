@@ -99,6 +99,63 @@ final class VASTPlaybackLoopTests: XCTestCase {
         XCTAssertEqual(outcome, .failed(.mediaFileTimeout), "an unwatched creative is not a completion")
     }
 
+    // MARK: - Giving the content back
+
+    /// The break borrows the host's player and has to give it back where it found
+    /// it. What a viewer notices when that goes wrong is the show restarting from
+    /// the beginning after every ad — or never coming back at all — so both are
+    /// checked rather than assumed.
+    ///
+    /// Measured, not assumed, about its own reach: removing the
+    /// `replaceCurrentItem` from `restore()` fails this test, while removing the
+    /// `seek` does not. The position survives on its own, because the same
+    /// `AVPlayerItem` instance goes back and an item carries its own playhead.
+    /// So what this pins is the contract — same item, same position, still
+    /// playing — and the seek is what keeps that contract true the day the item
+    /// is rebuilt from its URL instead of retained.
+    func testContentResumesFromWhereTheAdInterruptedIt() async throws {
+        let content = try Self.playableFile(seconds: 30)
+        defer { try? FileManager.default.removeItem(at: content) }
+
+        let player = AVPlayer(url: content)
+        let show = try XCTUnwrap(player.currentItem)
+        try await Self.waitUntilReady(show)
+
+        // Four seconds into the show, and playing — both halves matter, because
+        // the controller restores the item, the position *and* whether it was
+        // running.
+        await Self.seek(player, to: 4)
+        player.play()
+        let interrupted = player.currentTime().seconds
+        XCTAssertGreaterThan(interrupted, 3.5, "the show has to actually be somewhere")
+
+        let session = makeSession(
+            player: player,
+            clock: ScriptedClock(script: Self.wholeCreative),
+            transport: RecordingTransport(),
+            restoresPlayerItem: true
+        )
+
+        try await session.load(tag: Self.tag)
+        let outcome = await session.play()
+        XCTAssertEqual(outcome, .completed, "the break has to finish for the restore to be the thing under test")
+
+        // `restore()` seeks, and a seek finishes on its own turn rather than by
+        // the time `play()` returns.
+        let cameBack = await Self.waitUntil { player.currentItem === show }
+        XCTAssertTrue(cameBack, "the show never came back — the player is still on the creative")
+
+        let resumed = player.currentTime().seconds
+        XCTAssertGreaterThan(resumed, 3.0, "the show restarted instead of resuming")
+        // Generous on purpose: the creative takes real time to become playable,
+        // and the show is still running during it, so the snapshot is taken a
+        // fraction later than this test could measure.
+        XCTAssertEqual(resumed, interrupted, accuracy: 2.0, "the show did not resume where it stopped")
+
+        let playing = await Self.waitUntil { player.rate > 0 }
+        XCTAssertTrue(playing, "the show was playing when the ad took over, and is not now")
+    }
+
     // MARK: - Pause
 
     /// The regression this suite exists for.
@@ -235,17 +292,51 @@ private extension VASTPlaybackLoopTests {
     func makeSession(
         player: AVPlayer = AVPlayer(),
         clock: any iVASTClock,
-        transport: RecordingTransport
+        transport: RecordingTransport,
+        restoresPlayerItem: Bool = false
     ) -> VASTAdSession {
         VASTAdSession(
             player: player,
             configuration: VASTAdSession.Configuration(
-                restoresPlayerItem: false,
+                restoresPlayerItem: restoresPlayerItem,
                 clock: clock,
                 transport: transport,
                 loader: StubLoader(xml: response())
             )
         )
+    }
+
+    /// One pass over the 20s creative at 1×, ending within a tick of its end.
+    static var wholeCreative: [VASTTick] {
+        [
+            tick(at: 0, wall: 0),
+            tick(at: 5, wall: 5),
+            tick(at: 10, wall: 10),
+            tick(at: 15, wall: 15),
+            tick(at: 19.9, wall: 19.9),
+        ]
+    }
+
+    /// Polls a condition rather than sleeping a guessed interval.
+    static func waitUntil(
+        timeout: TimeInterval = 5,
+        _ condition: @MainActor () -> Bool
+    ) async -> Bool {
+        let deadline = ProcessInfo.processInfo.systemUptime + timeout
+        while ProcessInfo.processInfo.systemUptime < deadline {
+            if await MainActor.run(body: condition) { return true }
+            try? await Task.sleep(nanoseconds: 20_000_000)
+        }
+        return await MainActor.run(body: condition)
+    }
+
+    static func waitUntilReady(_ item: AVPlayerItem) async throws {
+        let ready = await waitUntil { item.status == .readyToPlay }
+        XCTAssertTrue(ready, "the content never became playable")
+    }
+
+    static func seek(_ player: AVPlayer, to seconds: TimeInterval) async {
+        await player.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
     }
 
     static func tick(at time: TimeInterval, wall: TimeInterval, rate: Float = 1) -> VASTTick {

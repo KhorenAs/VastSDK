@@ -478,9 +478,8 @@ final class SkipPill: NSView {
             icon.image = NSImage(systemSymbolName: "forward.end.fill", accessibilityDescription: nil)
             icon.contentTintColor = .black
             label.textColor = .black
-            // The host's own copy, in the host's own language — which is what
-            // `skipButtonBuilder` is for.
-            label.stringValue = "Բաց թողնել"
+            // The host's own copy; the SDK's own default is localised separately.
+            label.stringValue = "Skip"
         }
     }
 }
