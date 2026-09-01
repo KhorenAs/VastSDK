@@ -28,6 +28,15 @@ public struct VASTPodScheduler: Sendable {
         }
     }
 
+    /// What `next()` would hand over, without handing it over.
+    ///
+    /// For warming the creative after this one while this one plays. Consuming
+    /// the entry to look at it would mean playing the pod in the wrong order, so
+    /// looking has to be free.
+    public func peek() -> VASTAd? {
+        index < pod.count ? pod[index] : nil
+    }
+
     public mutating func next() -> VASTAd? {
         guard index < pod.count else { return nil }
         defer { index += 1 }

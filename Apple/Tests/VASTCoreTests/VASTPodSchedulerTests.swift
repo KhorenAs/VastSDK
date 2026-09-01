@@ -113,4 +113,27 @@ extension VASTPodSchedulerTests {
         XCTAssertEqual(scheduler.substituteForFailure()?.id, "spare")
         XCTAssertEqual(scheduler.currentIndex, 1, "a substitute does not consume a new slot")
     }
+
+    // MARK: - Looking ahead
+
+    /// Looking at what is next must be free. Consuming the entry to see it would
+    /// play the pod in the wrong order, which is how the warming this exists for
+    /// would have been paid for.
+    func testPeekDoesNotConsumeTheEntry() {
+        var scheduler = VASTPodScheduler(ads: [
+            ad("first", sequence: 1),
+            ad("second", sequence: 2),
+        ])
+
+        XCTAssertEqual(scheduler.peek()?.id, "first")
+        XCTAssertEqual(scheduler.peek()?.id, "first", "looking twice changed what is next")
+        XCTAssertEqual(scheduler.next()?.id, "first")
+        XCTAssertEqual(scheduler.peek()?.id, "second")
+    }
+
+    func testPeekIsEmptyOnceThePodIsSpent() {
+        var scheduler = VASTPodScheduler(ads: [ad("only", sequence: 1)])
+        _ = scheduler.next()
+        XCTAssertNil(scheduler.peek())
+    }
 }

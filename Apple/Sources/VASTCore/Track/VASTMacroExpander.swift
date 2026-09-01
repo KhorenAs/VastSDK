@@ -51,6 +51,18 @@ public struct VASTMacroExpander: Sendable {
         public var omidPartner: String?
         /// Vendor macros this SDK knows nothing about, supplied by the host.
         public var custom: [String: String]
+        /// Everything only the host can answer — identifier, consent, where the
+        /// break sits. Unset values report `-1`, which is what §6 means by
+        /// "unknown" and an honest thing to say.
+        public var host: VASTMacroValues
+        /// The MIME type of the creative being played, for `[MEDIAMIME]`.
+        public var mediaMIMEType: String?
+        /// `[TRANSACTIONID]` — one value for one break, so an ad server can tie
+        /// this request's beacons together.
+        public var transactionID: String?
+        /// Whether something will execute the ad's verification code, which is
+        /// what `[APIFRAMEWORKS]` is being asked about.
+        public var executesOMID: Bool
 
         public init(
             errorCode: VASTError? = nil,
@@ -66,7 +78,11 @@ public struct VASTMacroExpander: Sendable {
             appBundle: String? = nil,
             verificationVendors: [String] = [],
             omidPartner: String? = nil,
-            custom: [String: String] = [:]
+            custom: [String: String] = [:],
+            host: VASTMacroValues = VASTMacroValues(),
+            mediaMIMEType: String? = nil,
+            transactionID: String? = nil,
+            executesOMID: Bool = false
         ) {
             self.errorCode = errorCode
             self.verificationNotExecutedReason = verificationNotExecutedReason
@@ -82,6 +98,10 @@ public struct VASTMacroExpander: Sendable {
             self.verificationVendors = verificationVendors
             self.omidPartner = omidPartner
             self.custom = custom
+            self.host = host
+            self.mediaMIMEType = mediaMIMEType
+            self.transactionID = transactionID
+            self.executesOMID = executesOMID
         }
     }
 
@@ -98,6 +118,12 @@ public struct VASTMacroExpander: Sendable {
         "CONTENTID", "CONTENTURI", "MEDIAMIME", "OMIDPARTNER", "VASTVERSIONS",
         "APIFRAMEWORKS", "EXTENSIONS", "VERIFICATIONVENDORS", "REASON",
     ]
+
+    /// The VAST versions the parser accepts, for `[VASTVERSIONS]`.
+    ///
+    /// A list rather than one number: the parser is deliberately version-tolerant,
+    /// and an ad server that knows it may send VAST 2 will send its VAST 2.
+    static let supportedVASTVersions = "2,3,4,4.1,4.2,4.3"
 
     /// Reported for a macro the spec defines but this player does not know.
     static let unknownValue = "-1"
@@ -219,6 +245,75 @@ public struct VASTMacroExpander: Sendable {
 
         case "APPBUNDLE":
             return context.appBundle.map(Self.encode) ?? Self.unknownValue
+
+        // MARK: Host-supplied
+
+        case "IFA":
+            return context.host.identifierForAdvertising.map(Self.encode) ?? Self.unknownValue
+
+        case "IFATYPE":
+            return context.host.identifierType.map(Self.encode) ?? Self.unknownValue
+
+        case "LIMITADTRACKING":
+            // Reported as the spec's booleans, and only when it is known: `false`
+            // and "nobody asked" are different facts about a viewer.
+            return context.host.limitsAdTracking.map { $0 ? "1" : "0" } ?? Self.unknownValue
+
+        case "GDPRCONSENT":
+            // Already base64url by the time a CMP produces it, so encoding it
+            // again would corrupt it.
+            return context.host.gdprConsent ?? Self.unknownValue
+
+        case "REGULATIONS":
+            return context.host.regulations.map(Self.encode) ?? Self.unknownValue
+
+        case "DEVICEUA":
+            return context.host.deviceUserAgent.map(Self.encode) ?? Self.unknownValue
+
+        case "PLACEMENTTYPE":
+            return context.host.placementType.map(String.init) ?? Self.unknownValue
+
+        case "BREAKPOSITION":
+            return context.host.breakPosition.map(String.init) ?? Self.unknownValue
+
+        case "CONTENTID":
+            return context.host.contentID.map(Self.encode) ?? Self.unknownValue
+
+        case "CONTENTURI":
+            return context.host.contentURI.map { Self.encode($0.absoluteString) } ?? Self.unknownValue
+
+        // MARK: Answerable by the SDK itself
+
+        case "MEDIAMIME":
+            return context.mediaMIMEType.map(Self.encode) ?? Self.unknownValue
+
+        case "TRANSACTIONID":
+            return context.transactionID.map(Self.encode) ?? Self.unknownValue
+
+        case "SERVERSIDE":
+            // 0 is "the client made this request", which is always true here:
+            // there is no server-side stitching in this SDK to be unsure about.
+            return "0"
+
+        case "ADTYPE":
+            // The only creative this SDK plays is a Linear video.
+            return "video"
+
+        case "CLIENTUA":
+            // The spec's `name/version` form, naming the SDK rather than the app:
+            // the app is `[APPBUNDLE]`, and conflating the two loses both.
+            return Self.encode("VASTSDK/\(VASTVersion.current)")
+
+        case "VASTVERSIONS":
+            // What the parser accepts, not what this document happens to be.
+            return Self.supportedVASTVersions
+
+        case "APIFRAMEWORKS":
+            // 7 is OMID-1 in AdCOM's list, and it is only true when something is
+            // actually there to execute a vendor's code. Claiming it otherwise
+            // would tell a verification vendor to expect a session that never
+            // starts.
+            return context.executesOMID ? "7" : Self.unknownValue
 
         default:
             // Defined by the spec but not supplied: report unknown. Not defined by

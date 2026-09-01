@@ -50,6 +50,7 @@ extension VASTAdSession {
 
         let playback = VASTPlaybackController(player: player)
         activePlayback = playback
+        transactionID = UUID().uuidString
         defer {
             if configuration.restoresPlayerItem {
                 // An abandoned break must not hand the content back *playing*:
@@ -77,6 +78,11 @@ extension VASTAdSession {
             index += 1
             adPosition = AdPosition(index: index, total: scheduler.totalCount)
 
+            // While this creative plays, start fetching the one after it. A pod
+            // used to show a black gap per ad, because each one's readiness wait
+            // began only once the one before it had finished.
+            warmNextCreative(after: scheduler, using: playback)
+
             var outcome = await playOne(queued, using: playback)
             if case .failed = outcome, let substitute = scheduler.substituteForFailure() {
                 outcome = await playOne(substitute, using: playback)
@@ -87,6 +93,19 @@ extension VASTAdSession {
         self.scheduler = scheduler
         state = .finished(lastOutcome)
         return lastOutcome
+    }
+
+    /// Warms the creative the pod will need next, if the response gave one.
+    private func warmNextCreative(
+        after scheduler: VASTPodScheduler,
+        using playback: VASTPlaybackController
+    ) {
+        guard let upcoming = scheduler.peek() else { return }
+        guard let file = try? VASTMediaFileSelector().select(
+            from: upcoming.linear.mediaFiles,
+            capabilities: playbackCapabilities()
+        ) else { return }
+        playback.prepare(mediaFile: file)
     }
 
     // MARK: - One ad
@@ -322,11 +341,20 @@ extension VASTAdSession {
         var context = VASTMacroExpander.Context(
             adPlayhead: lastTick?.adTime,
             assetURI: currentMediaFile?.url,
+            // Everything below used to go out as "unknown" while the session knew
+            // the answer perfectly well — which is most of what made a request
+            // from this SDK look unattributable to an exchange.
+            playerSize: surfacePixelSize,
             isMuted: lastTick?.isMuted,
+            appBundle: Bundle.main.bundleIdentifier,
             // Answerable now that <AdVerifications> is parsed: before, this went
             // out as "unknown" even when the response named its vendors.
             verificationVendors: currentAd?.adVerifications.compactMap(\.vendor) ?? [],
-            omidPartner: measurement?.omidPartner
+            omidPartner: measurement?.omidPartner,
+            host: configuration.macroValues,
+            mediaMIMEType: currentMediaFile?.mimeType,
+            transactionID: transactionID,
+            executesOMID: measurement != nil
         )
         // Only an error beacon carries a code, and it is the code for *this*
         // failure — not the last one the session happened to see. `[REASON]`
@@ -344,6 +372,19 @@ extension VASTAdSession {
             url: macros.expand(beacon.url, with: context),
             adID: beacon.adID
         )
+    }
+
+    /// The player's size in pixels, for `[PLAYERSIZE]`.
+    ///
+    /// The surface is the player area, so this is the size of the ad as the viewer
+    /// sees it — which is the number an exchange is actually asking for. `nil`
+    /// where the SDK was never handed a surface, because a guess here is a
+    /// viewability signal the SDK has no business inventing.
+    private var surfacePixelSize: (width: Int, height: Int)? {
+        guard let surface = attachedSurface, surface.bounds.width > 1, surface.bounds.height > 1
+        else { return nil }
+        let scale = Self.surfaceScale(of: surface)
+        return (Int(surface.bounds.width * scale), Int(surface.bounds.height * scale))
     }
 
     /// Publishes the state SwiftUI and the delegate render from.

@@ -228,4 +228,124 @@ extension VASTMacroExpanderTests {
         XCTAssertTrue(expanded.contains("https%3A%2F%2Fcdn.test%2Fa.mp4"))
         XCTAssertFalse(expanded.contains("%25"))
     }
+
+    // MARK: - What only the host can answer
+
+    /// Without these an exchange often will not bid at all, so the point of the
+    /// group is that a supplied value arrives and an unsupplied one says so.
+    func testTheHostsIdentifierReachesTheServer() {
+        let values = VASTMacroValues(
+            identifierForAdvertising: "AAAA-BBBB",
+            identifierType: "idfa",
+            limitsAdTracking: false
+        )
+        let expanded = expander.expand(
+            "https://ads.test/i?ifa=[IFA]&t=[IFATYPE]&lmt=[LIMITADTRACKING]",
+            with: .init(host: values)
+        )
+        XCTAssertEqual(expanded, "https://ads.test/i?ifa=AAAA-BBBB&t=idfa&lmt=0")
+    }
+
+    /// `false` and "nobody asked" are different facts about a viewer, and the
+    /// difference is the one an auditor cares about.
+    func testAnUnknownTrackingPreferenceIsNotReportedAsPermission() {
+        let expanded = expander.expand(
+            "https://ads.test/i?lmt=[LIMITADTRACKING]",
+            with: .init(host: VASTMacroValues())
+        )
+        XCTAssertEqual(expanded, "https://ads.test/i?lmt=-1")
+    }
+
+    /// A TCF string is already base64url when the CMP hands it over. Encoding it
+    /// again is how consent arrives corrupted and gets read as absent.
+    func testTheConsentStringIsPassedThroughUntouched() {
+        let consent = "CPcqBNVPcqBNVABCDEF_gABABCAAA-AAAAAAAAAAAA"
+        let expanded = expander.expand(
+            "https://ads.test/i?gdpr_consent=[GDPRCONSENT]",
+            with: .init(host: VASTMacroValues(gdprConsent: consent))
+        )
+        XCTAssertTrue(expanded.hasSuffix(consent), "the consent string was re-encoded")
+    }
+
+    func testWhereTheBreakSitsComesFromTheHost() {
+        let expanded = expander.expand(
+            "https://ads.test/i?pos=[BREAKPOSITION]&plcmt=[PLACEMENTTYPE]&cid=[CONTENTID]",
+            with: .init(host: VASTMacroValues(placementType: 2, breakPosition: 1, contentID: "show-42"))
+        )
+        XCTAssertEqual(expanded, "https://ads.test/i?pos=1&plcmt=2&cid=show-42")
+    }
+
+    // MARK: - What the SDK can answer itself
+
+    /// Each of these was reporting "unknown" while the answer was sitting in the
+    /// session, which is most of what made a request look unattributable.
+    func testTheSDKAnswersWhatItKnowsAboutItself() {
+        let expanded = expander.expand(
+            "https://ads.test/i?ss=[SERVERSIDE]&type=[ADTYPE]&mime=[MEDIAMIME]&tx=[TRANSACTIONID]",
+            with: .init(mediaMIMEType: "video/mp4", transactionID: "abc-123")
+        )
+        XCTAssertEqual(
+            expanded,
+            "https://ads.test/i?ss=0&type=video&mime=video%2Fmp4&tx=abc-123"
+        )
+    }
+
+    /// `[CLIENTUA]` names the SDK and `[APPBUNDLE]` names the app. Conflating them
+    /// loses both, and an exchange uses the first to tell one player from another
+    /// when a creative misbehaves.
+    func testTheClientUserAgentNamesTheSDKNotTheApp() {
+        let expanded = expander.expand(
+            "https://ads.test/i?ua=[CLIENTUA]&app=[APPBUNDLE]",
+            with: .init(appBundle: "com.kinodaran.app")
+        )
+        XCTAssertTrue(expanded.contains("VASTSDK%2F\(VASTVersion.current)"))
+        XCTAssertTrue(expanded.contains("app=com.kinodaran.app"))
+    }
+
+    /// What the parser accepts, not what this response happens to be — an ad
+    /// server that knows it may send VAST 2 will send its VAST 2.
+    func testEveryParsableVASTVersionIsAdvertised() {
+        let expanded = expander.expand("https://ads.test/i?v=[VASTVERSIONS]", with: .init())
+        XCTAssertEqual(expanded, "https://ads.test/i?v=2,3,4,4.1,4.2,4.3")
+    }
+
+    /// OMID is claimed only when something is actually there to run a vendor's
+    /// code. Claiming it otherwise tells a verification vendor to expect a
+    /// session that never starts.
+    func testOMIDIsClaimedOnlyWhenSomethingWillRunIt() {
+        XCTAssertEqual(
+            expander.expand("[APIFRAMEWORKS]", with: .init(executesOMID: false)), "-1"
+        )
+        XCTAssertEqual(
+            expander.expand("[APIFRAMEWORKS]", with: .init(executesOMID: true)), "7"
+        )
+    }
+
+    /// The player's own size, which is the number an exchange is asking for.
+    func testPlayerSizeIsAnArrayWithItsCommaIntact() {
+        let expanded = expander.expand(
+            "https://ads.test/i?size=[PLAYERSIZE]",
+            with: .init(playerSize: (width: 1170, height: 658))
+        )
+        XCTAssertEqual(expanded, "https://ads.test/i?size=1170,658")
+    }
+
+    /// And the rule the whole group depends on: a spec macro nobody supplied says
+    /// so, while a vendor's macro is left exactly as it was.
+    func testUnsuppliedSpecMacrosSayUnknownAndVendorMacrosAreLeftAlone() {
+        let expanded = expander.expand(
+            "https://ads.test/i?ifa=[IFA]&dev=[DEVICEUA]&own=[CORRELATOR]",
+            with: .init()
+        )
+        // Left as text here, because this is the string form. Only the `URL`
+        // overload re-encodes the brackets, and it does that so Foundation cannot
+        // "repair" the whole query and double-encode what was already correct.
+        XCTAssertEqual(expanded, "https://ads.test/i?ifa=-1&dev=-1&own=[CORRELATOR]")
+
+        let asURL = expander.expand(
+            URL(string: "https://ads.test/i?own=%5BCORRELATOR%5D")!,
+            with: .init()
+        )
+        XCTAssertEqual(asURL.absoluteString, "https://ads.test/i?own=%5BCORRELATOR%5D")
+    }
 }

@@ -57,6 +57,13 @@ final class VASTPlaybackController {
 
     private var observers: [any NSObjectProtocol] = []
 
+    /// Assets warmed ahead of time, by URL.
+    ///
+    /// Held rather than discarded because the warming is only worth anything if
+    /// the same asset is the one that plays: a second `AVURLAsset` for the same
+    /// URL starts its metadata over.
+    private var warmed: [URL: AVURLAsset] = [:]
+
     init(player: AVPlayer) {
         self.player = player
         observeSystemInterruptions()
@@ -67,8 +74,24 @@ final class VASTPlaybackController {
     /// Swift 6 strict concurrency. The session calls this when the break ends.
     func invalidate() {
         wantsPlayback = false
+        warmed.removeAll()
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
+    }
+
+    /// Starts fetching what the break will need next, while it plays what it has.
+    ///
+    /// Not prebuffering, and it would be dishonest to call it that: an
+    /// `AVPlayerItem` does not buffer until it belongs to a player, and giving a
+    /// second player one would double the bandwidth to hide a gap. What this does
+    /// warm is the part the readiness wait actually spends — DNS, the TLS
+    /// handshake, and the container's header — so the next creative starts from a
+    /// connection that already exists.
+    func prepare(mediaFile: VASTAd.MediaFile) {
+        guard !isAborted, warmed[mediaFile.url] == nil else { return }
+        let asset = AVURLAsset(url: mediaFile.url)
+        warmed[mediaFile.url] = asset
+        Task { _ = try? await asset.load(.isPlayable, .duration) }
     }
 
     /// Loads a creative and starts it playing.
@@ -80,7 +103,11 @@ final class VASTPlaybackController {
         snapshotHostIfNeeded()
         wantsPlayback = true
 
-        let item = AVPlayerItem(url: mediaFile.url)
+        // The warmed asset if there is one, and taken rather than copied: a pod
+        // does not play the same creative twice, and holding every asset for the
+        // length of the break would hold every creative's memory with it.
+        let asset = warmed.removeValue(forKey: mediaFile.url) ?? AVURLAsset(url: mediaFile.url)
+        let item = AVPlayerItem(asset: asset)
         player.replaceCurrentItem(with: item)
         // Ask for playback straight away rather than after readiness: AVPlayer
         // already defers until the item can play, and requesting it up front

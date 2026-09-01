@@ -27,6 +27,10 @@ public extension VASTAdSession {
         var clock: (any iVASTClock)? { get }
         var transport: (any iVASTBeaconTransport)? { get }
         var loader: (any iVASTResourceLoader)? { get }
+        /// §6 macro values only the host can supply — identifier, consent, where
+        /// this break sits in its content. Unsupplied values report `-1`, which
+        /// is honest and also often unbiddable; see `VASTMacroValues`.
+        var macroValues: VASTMacroValues { get }
     }
 
     /// Who provides the skip control.
@@ -70,6 +74,7 @@ public extension VASTAdSession {
         public var clock: (any iVASTClock)?
         public var transport: (any iVASTBeaconTransport)?
         public var loader: (any iVASTResourceLoader)?
+        public var macroValues: VASTMacroValues
 
         /// Defaults are the compliant ones: the SDK draws the skip control and
         /// the ad surface is clickable, so a host that configures nothing still
@@ -83,7 +88,8 @@ public extension VASTAdSession {
             clickPresentation: ClickPresentation = .surface,
             clock: (any iVASTClock)? = nil,
             transport: (any iVASTBeaconTransport)? = nil,
-            loader: (any iVASTResourceLoader)? = nil
+            loader: (any iVASTResourceLoader)? = nil,
+            macroValues: VASTMacroValues = VASTMacroValues()
         ) {
             self.maxWrapperDepth = maxWrapperDepth
             self.wrapperTimeout = wrapperTimeout
@@ -94,6 +100,23 @@ public extension VASTAdSession {
             self.clock = clock
             self.transport = transport
             self.loader = loader
+            self.macroValues = macroValues
         }
     }
+}
+
+/// Defaults for everything added to `iConfiguration` after it shipped.
+///
+/// A protocol requirement with no default is a source break for every host that
+/// already wrote a configuration type, over settings most of them will never
+/// touch. These two are exactly that: a budget with a sensible value, and values
+/// only some hosts can supply at all.
+public extension VASTAdSession.iConfiguration {
+
+    /// Ten seconds for a whole response, however many Wrappers it takes.
+    var resolutionTimeout: TimeInterval { 10 }
+
+    /// Nothing, which reports `-1` for each — honest, and what a host that never
+    /// mentioned them means.
+    var macroValues: VASTMacroValues { VASTMacroValues() }
 }

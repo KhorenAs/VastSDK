@@ -113,6 +113,11 @@ public final class VASTAdSession: ObservableObject {
     var lastTick: VASTTick?
     /// The creative being played, for `[ASSETURI]`.
     var currentMediaFile: VASTAd.MediaFile?
+    /// `[TRANSACTIONID]` — one value for one break, so an ad server can tie a
+    /// break's beacons together without guessing from timestamps. Regenerated per
+    /// break rather than per session: two breaks on one screen are two
+    /// transactions.
+    var transactionID: String?
     let macros = VASTMacroExpander()
     /// Weak on purpose. The surface holds the session so it can read published
     /// state, and the container it was added to owns the surface — so a strong
