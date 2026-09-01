@@ -96,8 +96,11 @@ the whole screen — an inline player was handed 4K renditions it could not show
 Everything above is closed except item 7. What has come up since, unclosed:
 
 - **The AdChoices icon is parsed but not drawn.** `ad.icons` carries it; nothing
-  renders it. In the EU rendering it is not optional, so a host either draws it
-  from that model or the SDK grows a surface element that does.
+  renders it. §3.15 expects a player to display one, and a response carrying
+  `program="AdChoices"` means somebody upstream undertook to — under the EDAA
+  self-regulatory programme or a demand partner's policy, not under statute. So it
+  matters exactly when a partner starts sending icons and not before: a host either
+  draws it from the model or the SDK grows a surface element that does.
 - **tvOS cannot offer a surface click**, by construction: a transparent layer
   takes no focus. The SDK reports it and the demos opt out knowingly; a real tvOS
   host needs `clickPresentation = .host` and a focusable control of its own.

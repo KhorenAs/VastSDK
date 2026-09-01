@@ -129,9 +129,14 @@ package substitutes for it.
 `<Icon>` is the same shape of decision, one step further along: it is parsed into
 `ad.icons` — program, position, offset, resource, click-through — and not drawn.
 A host that draws its own ad UI already has everything it needs to render an
-AdChoices mark from that, and in the EU rendering it is not optional. What the
-SDK will not do is fetch and place an image on your behalf and leave you unable
-to tell whether it appeared.
+AdChoices mark from that. What the SDK will not do is fetch and place an image on
+your behalf and leave you unable to tell whether it appeared.
+
+Worth being exact about the obligation, because it is easy to overstate: §3.15
+expects a player to display an icon, and an `<Icon program="AdChoices">` in a
+response means somebody upstream undertook to show it — under the EDAA
+self-regulatory programme, or under a demand partner's own policy. That is a
+contract rather than a statute, and whose contract depends on who sent the icon.
 
 **`.host` transfers the obligation, and nothing checks it.** Under
 `skipPresentation = .host` or `clickPresentation = .host` the SDK draws no

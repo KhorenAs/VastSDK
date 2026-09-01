@@ -61,8 +61,14 @@ public extension VASTAd {
     /// Parsed and handed over rather than drawn. Drawing it means fetching an
     /// image, placing it by the coordinates below, and opening a click-through of
     /// its own; a host that draws its own ad UI is already doing all three for its
-    /// own controls. What matters is that the response's icon is not silently
-    /// dropped, because in the EU rendering it is not optional.
+    /// own controls.
+    ///
+    /// What matters is that the response's icon is not silently dropped. §3.15
+    /// expects the player to display one, and a response carrying
+    /// `program="AdChoices"` means somebody upstream undertook to show it — under
+    /// the EDAA self-regulatory programme, or under a demand partner's own policy.
+    /// Neither is statute, and whose obligation it is depends on who sent the
+    /// icon; what the SDK owes either way is the model.
     struct Icon: Sendable {
         /// `program` — which scheme the icon belongs to, e.g. `AdChoices`.
         public let program: String?
