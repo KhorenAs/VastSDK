@@ -60,11 +60,18 @@ control of its own, or `.disabled`.
 | Wrapper chains (depth ≤ 5, tracker accumulation, error fan-out) | ✅ |
 | Tracking: impression, quartiles, progress offsets, skip, click, error | ✅ |
 | VAST 2.0/3.0 legacy event names | ✅ |
-| §6 macros (`[ERRORCODE]`, `[ADPLAYHEAD]`, `[CACHEBUSTING]`, …) | ✅ |
+| Pause and resume, reported as player operation metrics | ✅ |
+| §6 macros — everything the session knows, plus `VASTMacroValues` for what only you do | ✅ |
 | `<Extensions>` handed to the host raw | ✅ |
 | `<AdVerifications>` parsed and handed over — VAST 3 and 4 shapes | ✅ |
+| `<UniversalAdId>` · `<AdServingId>` · `<Advertiser>` · `<Pricing>` · `<Category>` · `<Expires>` | ✅ |
+| `<CustomClick>`, kept apart from `<ClickTracking>` | ✅ |
+| `<ViewableImpression>` | ✅ parsed — and `<ViewUndetermined>` is what this player can honestly send |
+| `<Icon>` (AdChoices) | ✅ parsed into `ad.icons` — ❌ not drawn; see below |
+| Undelivered beacons kept and retried, across launches | ✅ |
+| Skip control and countdown localised (`en`, `hy`) | ✅ |
 | Executing verification code (OM SDK) | ❌ by decision — `iVASTAdMeasurement` is the seam |
-| NonLinear · Companion · VPAID · SIMID · Icons | ❌ by decision |
+| NonLinear · Companion · VPAID · SIMID | ❌ by decision |
 | VMAP (ad-break scheduling) | ❌ out of scope |
 
 Ignored elements are skipped, not rejected — an unknown element never fails a
@@ -103,6 +110,29 @@ it. With an adapter set the SDK goes quiet, drives the adapter from the same
 beacons the ad server receives, and takes `resourceLoadError` back through
 `reportVerificationNotExecuted(_:reason:)`, which only the loader can know.
 
+`<ViewableImpression>` follows from the same rule. §3.6 offers three outcomes —
+viewable, not viewable, undetermined — and a player with no viewability
+measurement can honestly claim exactly one of them, so with nothing set the SDK
+sends `<ViewUndetermined>`. Saying nothing at all is the tempting option and the
+wrong one: an unmeasured impression left silent is counted as measured by whoever
+asked. Note the other edge of that: **setting `measurement` makes the SDK go
+quiet about viewability too**, on the assumption that your adapter is measuring
+it. An adapter that does not leaves the vendor hearing nothing — neither a
+measurement nor an admission that there was none.
+
+What this costs in practice is narrow and worth stating plainly. Serving your own
+inventory is unaffected. What you cannot do is satisfy a buyer whose contract
+requires third-party accredited measurement, because the independence is the
+product, not the number. That needs the OM SDK licence, and nothing in this
+package substitutes for it.
+
+`<Icon>` is the same shape of decision, one step further along: it is parsed into
+`ad.icons` — program, position, offset, resource, click-through — and not drawn.
+A host that draws its own ad UI already has everything it needs to render an
+AdChoices mark from that, and in the EU rendering it is not optional. What the
+SDK will not do is fetch and place an image on your behalf and leave you unable
+to tell whether it appeared.
+
 **`.host` transfers the obligation, and nothing checks it.** Under
 `skipPresentation = .host` or `clickPresentation = .host` the SDK draws no
 control and makes no claim about whether you drew one. It cannot: it does not
@@ -134,6 +164,26 @@ Each of these is a bug that was found and is now pinned by a test.
   whole string, double-encoding values that were already correct.
 - **iOS never resumes playback after backgrounding.** `rate` is left at 0, and a
   stall watchdog that keys on `rate > 0` cannot tell that apart from a hang.
+- **Recovering from that made pausing impossible.** Re-issuing playback every tick
+  is indistinguishable, from the player alone, from a host deliberately pausing —
+  so a pause was undone within one tick and reported to nobody. It has to be
+  stated, which is why `pause()` exists rather than watching `rate`.
+- **A host-supplied control cannot be handed back as-is.** `makeUIView` runs once
+  per view identity, so returning the builder's view froze whatever the first call
+  produced: a countdown that never counted, a skip control stuck on the hourglass
+  it was born with. The container needs an intrinsic size too, or the control
+  collapses to its minimum and its label is clipped away.
+- **`UIControl` does not send `.primaryActionTriggered` from a tap.** Only
+  `UIButton` does. A custom control registered for it works on tvOS, where the
+  remote's select is raised by hand, and silently does nothing on iOS.
+- **A fraction of the running time is the wrong thing to cut.** Ending the ad at
+  97% of its duration lost nearly a second of a thirty-second creative and a third
+  of that from a ten-second one. The gap that matters is one tick, so the margin is
+  in seconds.
+- **Rebuilding a value type drops what you forget to copy.** The Wrapper chain
+  reconstructs the ad on its way out; every field added to `VASTAd` and not added
+  there disappears for any response that came through a Wrapper — which is most of
+  them, and invisible until a report comes back empty.
 
 ## Running things
 

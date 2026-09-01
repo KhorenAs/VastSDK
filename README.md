@@ -12,6 +12,12 @@ Each platform is a self-contained project with its own build and its own tests.
 They share the specification, the test fixtures and the behavioural decisions —
 not code.
 
+Verification is described, not executed: `<AdVerifications>` and
+`<ViewableImpression>` are parsed and handed over, and with nothing set to measure
+them the SDK reports `verificationNotExecuted` and `<ViewUndetermined>` rather
+than staying silent. Running a vendor's code means the IAB Open Measurement SDK,
+which is licensed separately — `iVASTAdMeasurement` is the seam it plugs into.
+
 [GO-LIVE.md](GO-LIVE.md) lists what the Apple SDK still needs before it serves
 real ads, ordered by what blocks the road rather than by effort.
 
