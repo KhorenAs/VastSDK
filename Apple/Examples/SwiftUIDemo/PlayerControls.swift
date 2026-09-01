@@ -37,7 +37,13 @@ struct ContentControls: View {
                 Spacer()
 
                 if model.isBuffering {
+                    // `controlSize` is unavailable on tvOS, where the default
+                    // indicator is the right size anyway.
+                    #if os(tvOS)
+                    ProgressView()
+                    #else
                     ProgressView().controlSize(.small)
+                    #endif
                 }
                 Text("\(ContentPlayerModel.timecode(model.currentTime)) / \(ContentPlayerModel.timecode(model.duration))")
                     .font(.system(.caption, design: .monospaced))

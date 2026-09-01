@@ -21,15 +21,18 @@ final class VASTPlaybackLoopTests: XCTestCase {
 
     private var creative: URL!
 
+    // No `super` calls: this case is `@MainActor`, and awaiting
+    // `XCTestCase.setUp()` from it sends a non-Sendable `self` across isolation.
+    // Under a stricter toolchain than the one this was written on that is an
+    // error, not a warning — which is how CI caught it and a local `swift test`
+    // did not. `XCTestCase`'s own implementations do nothing worth calling.
     override func setUp() async throws {
-        try await super.setUp()
         creative = try Self.playableFile()
     }
 
     override func tearDown() async throws {
         if let creative { try? FileManager.default.removeItem(at: creative) }
         creative = nil
-        try await super.tearDown()
     }
 
     // MARK: - The full sequence
