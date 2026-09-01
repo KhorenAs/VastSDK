@@ -55,15 +55,47 @@ final class VASTTagResolverTests: XCTestCase {
         XCTAssertEqual(resolution.chain.depth, 1, "the hop this document itself made was forgotten")
     }
 
+    // MARK: - What the chain must not lose
+
+    /// The chain rebuilds the ad on the way out, and everything it forgets to
+    /// copy disappears for any response that came through a Wrapper — which is
+    /// most of them. These are the fields a reporting pipeline needs, so losing
+    /// them is invisible until someone asks why a report is empty.
+    func testTheChainCarriesTheInLinesOwnMetadata() async throws {
+        let resolution = try await Self.resolver(inLine: Self.richInLine)
+            .resolve(tag: Self.outerURL)
+        let ad = try XCTUnwrap(resolution.ads.first)
+
+        XCTAssertEqual(ad.adServingID, "serving-1")
+        XCTAssertEqual(ad.universalAdIDs.first?.value, "CNPA0484000H")
+        XCTAssertEqual(ad.advertiser, "Kinodaran")
+        XCTAssertEqual(ad.icons.count, 1)
+        XCTAssertEqual(ad.linear.customClicks.map(\.lastPathComponent), ["custom"])
+    }
+
+    /// A Wrapper may ask about viewability on its own account (§3.6). An
+    /// intermediary that wanted to hear does not stop wanting because the InLine
+    /// wanted to as well, so both sets of URIs survive.
+    func testBothTheWrapperAndTheInLineAreHeardAboutViewability() async throws {
+        let resolution = try await Self.resolver(inLine: Self.richInLine)
+            .resolve(tag: Self.outerURL)
+        let asked = try XCTUnwrap(try XCTUnwrap(resolution.ads.first).viewableImpression)
+
+        XCTAssertEqual(
+            Set(asked.viewUndetermined.map(\.host)),
+            ["inner.example", "outer.example"]
+        )
+    }
+
     // MARK: - Fixtures
 
     private static let outerURL = URL(string: "https://outer.example/vast.xml")!
     private static let innerURL = URL(string: "https://inner.example/vast.xml")!
 
-    private static func resolver() -> VASTTagResolver {
+    private static func resolver(inLine page: String? = nil) -> VASTTagResolver {
         VASTTagResolver(loader: StubLoader(pages: [
             outerURL.absoluteString: wrapper,
-            innerURL.absoluteString: inLine,
+            innerURL.absoluteString: page ?? inLine,
         ]))
     }
 
@@ -73,6 +105,9 @@ final class VASTTagResolverTests: XCTestCase {
       <Impression><![CDATA[https://outer.example/impression]]></Impression>
       <Error><![CDATA[https://outer.example/error]]></Error>
       <VASTAdTagURI><![CDATA[https://inner.example/vast.xml]]></VASTAdTagURI>
+      <ViewableImpression>
+        <ViewUndetermined><![CDATA[https://outer.example/undetermined]]></ViewUndetermined>
+      </ViewableImpression>
       <Creatives><Creative><Linear><TrackingEvents>
         <Tracking event="start"><![CDATA[https://outer.example/start]]></Tracking>
       </TrackingEvents></Linear></Creative></Creatives>
@@ -101,4 +136,35 @@ private struct StubLoader: iVASTResourceLoader {
         guard let xml = pages[url.absoluteString] else { throw VASTError.wrapperTimeout }
         return xml
     }
+}
+
+private extension VASTTagResolverTests {
+
+    /// An InLine carrying the VAST 4 fields a reporting pipeline reads.
+    static let richInLine = """
+    <VAST version="4.3"><Ad id="inner"><InLine>
+      <AdSystem>inner</AdSystem>
+      <AdServingId>serving-1</AdServingId>
+      <Advertiser>Kinodaran</Advertiser>
+      <Impression><![CDATA[https://inner.example/impression]]></Impression>
+      <ViewableImpression>
+        <ViewUndetermined><![CDATA[https://inner.example/undetermined]]></ViewUndetermined>
+      </ViewableImpression>
+      <Creatives><Creative>
+        <UniversalAdId idRegistry="Ad-ID">CNPA0484000H</UniversalAdId>
+        <Icons><Icon program="AdChoices">
+          <StaticResource creativeType="image/png"><![CDATA[https://inner.example/i.png]]></StaticResource>
+        </Icon></Icons>
+        <Linear>
+          <Duration>00:00:15</Duration>
+          <VideoClicks>
+            <CustomClick><![CDATA[https://inner.example/custom]]></CustomClick>
+          </VideoClicks>
+          <MediaFiles>
+            <MediaFile delivery="progressive" type="video/mp4"><![CDATA[https://inner.example/a.mp4]]></MediaFile>
+          </MediaFiles>
+        </Linear>
+      </Creative></Creatives>
+    </InLine></Ad></VAST>
+    """
 }

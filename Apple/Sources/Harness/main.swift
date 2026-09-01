@@ -49,6 +49,8 @@ func label(_ beacon: VASTBeacon) -> String {
     case .clickTracking: "clickTracking"
     case .error(let error): "error \(error.rawValue)"
     case .verificationNotExecuted(let reason): "verificationNotExecuted \(reason.rawValue)"
+    case .viewUndetermined: "viewUndetermined"
+    case .customClick: "customClick"
     }
 }
 

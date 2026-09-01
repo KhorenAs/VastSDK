@@ -391,6 +391,19 @@ public final class VASTAdSession: ObservableObject {
         return ad.linear.clickThrough
     }
 
+    /// Reports an interaction that opens nothing — `<CustomClick>` (§3.10.3).
+    ///
+    /// Separate from `click()` on purpose. A click-through takes the viewer
+    /// somewhere and its trackers say so; a custom click is the host saying "the
+    /// viewer did something with the ad" without any destination. Real tags carry
+    /// both, and firing one for the other misreports both.
+    public func reportCustomClick() {
+        guard var engine = activeEngine else { return }
+        let beacons = engine.reportCustomClick()
+        activeEngine = engine
+        send(beacons)
+    }
+
     /// Ends the running break and waits for it to actually be over.
     ///
     /// Aborting the playback controller is the part that matters: cancelling the

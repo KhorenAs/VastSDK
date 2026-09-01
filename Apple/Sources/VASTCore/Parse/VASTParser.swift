@@ -62,12 +62,42 @@ private final class Builder: NSObject, XMLParserDelegate {
     private var allowMultipleAds = false
     private var fallbackOnNoAd: Bool?
 
+    // VAST 4 metadata. Required elements, in the parts of the spec that decide
+    // whose count is right when two reports disagree.
+    private var adServingID: String?
+    private var universalAdIDs: [VASTAd.UniversalAdID] = []
+    private var pendingUniversalAdIDRegistry: String?
+    private var advertiser: String?
+    private var pricing: VASTAd.Pricing?
+    private var pendingPricing: [String: String] = [:]
+    private var categories: [VASTAd.Category] = []
+    private var pendingCategoryAuthority: String?
+    private var expires: TimeInterval?
+
+    // Current <ViewableImpression>
+    private var sawViewableImpression = false
+    private var viewableImpressionID: String?
+    private var viewable: [URL] = []
+    private var notViewable: [URL] = []
+    private var viewUndetermined: [URL] = []
+
+    // Current <Icon>
+    private var icons: [VASTAd.Icon] = []
+    private var insideIcon = false
+    private var pendingIcon: [String: String] = [:]
+    private var iconStaticResource: URL?
+    private var iconStaticType: String?
+    private var iconClickThrough: URL?
+    private var iconClickTracking: [URL] = []
+    private var iconViewTracking: [URL] = []
+
     // Current <Linear>
     private var duration: TimeInterval = 0
     private var skipOffset: VASTAd.SkipOffset?
     private var mediaFiles: [VASTAd.MediaFile] = []
     private var clickThrough: URL?
     private var clickTracking: [URL] = []
+    private var customClicks: [URL] = []
     private var tracking: [VASTAd.TrackingEvent: [URL]] = [:]
     private var progress: [VASTAd.ProgressEvent] = []
 
@@ -153,6 +183,33 @@ private final class Builder: NSObject, XMLParserDelegate {
         case "MediaFile":
             pendingMediaFile = attributes
 
+        case "UniversalAdId":
+            pendingUniversalAdIDRegistry = attributes["idRegistry"]
+
+        case "ViewableImpression":
+            sawViewableImpression = true
+            viewableImpressionID = attributes["id"]
+
+        case "Icon":
+            insideIcon = true
+            pendingIcon = attributes
+            iconStaticResource = nil
+            iconStaticType = nil
+            iconClickThrough = nil
+            iconClickTracking = []
+            iconViewTracking = []
+
+        case "StaticResource":
+            // Also a NonLinear and Companion element, neither of which this SDK
+            // plays; only an icon's copy is kept.
+            if insideIcon { iconStaticType = attributes["creativeType"] }
+
+        case "Pricing":
+            pendingPricing = attributes
+
+        case "Category":
+            pendingCategoryAuthority = attributes["authority"]
+
         case "AdVerifications":
             insideVerifications = true
 
@@ -237,6 +294,67 @@ private final class Builder: NSObject, XMLParserDelegate {
         case "AdSystem":
             adSystem = value
 
+        case "AdServingId":
+            adServingID = value.isEmpty ? nil : value
+
+        case "UniversalAdId":
+            // A registry of "unknown" is a real answer some servers give; only an
+            // empty value means there is nothing to record.
+            if !value.isEmpty {
+                universalAdIDs.append(.init(registry: pendingUniversalAdIDRegistry, value: value))
+            }
+            pendingUniversalAdIDRegistry = nil
+
+        case "Advertiser":
+            advertiser = value.isEmpty ? nil : value
+
+        case "Pricing":
+            let attributes = pendingPricing
+            pendingPricing = [:]
+            if let amount = Double(value) {
+                pricing = .init(
+                    model: attributes["model"],
+                    currency: attributes["currency"],
+                    value: amount
+                )
+            }
+
+        case "Category":
+            let authority = pendingCategoryAuthority
+            pendingCategoryAuthority = nil
+            if !value.isEmpty { categories.append(.init(authority: authority, code: value)) }
+
+        case "Expires":
+            // Plain seconds, unlike <Duration>'s timecode.
+            expires = Double(value)
+
+        case "Viewable":
+            append(value, to: &viewable)
+
+        case "NotViewable":
+            append(value, to: &notViewable)
+
+        case "ViewUndetermined":
+            append(value, to: &viewUndetermined)
+
+        case "StaticResource":
+            if insideIcon { iconStaticResource = Self.url(value) }
+
+        case "IconClickThrough":
+            iconClickThrough = Self.url(value)
+
+        case "IconClickTracking":
+            append(value, to: &iconClickTracking)
+
+        case "IconViewTracking":
+            append(value, to: &iconViewTracking)
+
+        case "Icon":
+            finishIcon()
+
+        case "CustomClick":
+            append(value, to: &customClicks)
+
         case "AdTitle":
             adTitle = value
 
@@ -304,7 +422,8 @@ private final class Builder: NSObject, XMLParserDelegate {
             }
 
         case "Linear", "Creative", "Creatives", "InLine", "TrackingEvents",
-             "VideoClicks", "MediaFiles", "Extensions":
+             "VideoClicks", "MediaFiles", "Extensions", "Icons", "IconClicks",
+             "ViewableImpression":
             break
 
         case "Ad":
@@ -395,6 +514,49 @@ private final class Builder: NSObject, XMLParserDelegate {
         ))
     }
 
+    /// A `<ViewableImpression>` with no URI at all asked for nothing.
+    private func finishedViewableImpression() -> VASTAd.ViewableImpression? {
+        guard sawViewableImpression else { return nil }
+        let impression = VASTAd.ViewableImpression(
+            id: viewableImpressionID,
+            viewable: viewable,
+            notViewable: notViewable,
+            viewUndetermined: viewUndetermined
+        )
+        return impression.isEmpty ? nil : impression
+    }
+
+    /// An icon with nothing to draw is dropped: a host cannot render an absent
+    /// image, and keeping it would look like an AdChoices mark that failed.
+    private func finishIcon() {
+        let attributes = pendingIcon
+        defer {
+            insideIcon = false
+            pendingIcon = [:]
+            iconStaticResource = nil
+            iconStaticType = nil
+            iconClickThrough = nil
+            iconClickTracking = []
+            iconViewTracking = []
+        }
+        guard let resource = iconStaticResource else { return }
+        icons.append(VASTAd.Icon(
+            program: attributes["program"],
+            // Real tags send width="" — an empty attribute is not a zero.
+            width: attributes["width"].flatMap(Int.init),
+            height: attributes["height"].flatMap(Int.init),
+            xPosition: attributes["xPosition"],
+            yPosition: attributes["yPosition"],
+            offset: attributes["offset"].flatMap(Self.seconds),
+            duration: attributes["duration"].flatMap(Self.seconds),
+            staticResource: resource,
+            staticResourceType: iconStaticType,
+            clickThrough: iconClickThrough,
+            clickTracking: iconClickTracking,
+            viewTracking: iconViewTracking
+        ))
+    }
+
     private func finishAd() {
         let entry: VASTDocument.Entry
 
@@ -410,6 +572,7 @@ private final class Builder: NSObject, XMLParserDelegate {
                     clickThrough: clickThrough,
                     extensions: extensions,
                     verifications: verifications,
+                    viewableImpression: finishedViewableImpression(),
                     followAdditionalWrappers: followAdditionalWrappers,
                     allowMultipleAds: allowMultipleAds,
                     fallbackOnNoAd: fallbackOnNoAd
@@ -440,13 +603,22 @@ private final class Builder: NSObject, XMLParserDelegate {
                         mediaFiles: mediaFiles,
                         clickThrough: clickThrough,
                         clickTracking: clickTracking,
+                        customClicks: customClicks,
                         trackingEvents: tracking,
                         progressEvents: progress
                     ),
                     impressions: impressions,
                     errors: errors,
                     extensions: extensions,
-                    adVerifications: verifications
+                    adVerifications: verifications,
+                    adServingID: adServingID,
+                    universalAdIDs: universalAdIDs,
+                    viewableImpression: finishedViewableImpression(),
+                    icons: icons,
+                    advertiser: advertiser,
+                    pricing: pricing,
+                    categories: categories,
+                    expires: expires
                 )
             ))
         }
@@ -461,7 +633,15 @@ private final class Builder: NSObject, XMLParserDelegate {
         adSystem = nil; adTitle = nil
         followAdditionalWrappers = true; allowMultipleAds = false; fallbackOnNoAd = nil
         duration = 0; skipOffset = nil; mediaFiles = []
-        clickThrough = nil; clickTracking = []; tracking = [:]; progress = []
+        clickThrough = nil; clickTracking = []; customClicks = []; tracking = [:]; progress = []
+        adServingID = nil; universalAdIDs = []; pendingUniversalAdIDRegistry = nil
+        advertiser = nil; pricing = nil; pendingPricing = [:]
+        categories = []; pendingCategoryAuthority = nil; expires = nil
+        sawViewableImpression = false; viewableImpressionID = nil
+        viewable = []; notViewable = []; viewUndetermined = []
+        icons = []; insideIcon = false; pendingIcon = [:]
+        iconStaticResource = nil; iconStaticType = nil; iconClickThrough = nil
+        iconClickTracking = []; iconViewTracking = []
         extensions = []; sawUnplayableCreative = false
         verifications = []; insideVerifications = false; extensionIsVerifications = false
         verificationVendor = nil; verificationResources = []

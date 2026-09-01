@@ -322,8 +322,11 @@ extension VASTAdSession {
             return .clicked
         case .error(let error):
             return .failed(error)
-        case .verificationNotExecuted:
-            // Only fired when nothing is measuring, so nobody is listening.
+        case .customClick:
+            return .clicked
+        case .verificationNotExecuted, .viewUndetermined:
+            // Both are only fired when nothing is measuring, so nobody is
+            // listening for them.
             return nil
         case .tracking(let event):
             switch event {

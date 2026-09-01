@@ -215,6 +215,7 @@ public struct VASTTrackingEngine: Sendable {
             // Reported with the impression, not later: the vendor is deciding
             // right now whether this session counts as measured.
             beacons += verificationsNotExecuted()
+            beacons += viewabilityUndetermined()
             beacons += fire(.creativeView)
         }
         beacons += fire(.start)
@@ -233,6 +234,27 @@ public struct VASTTrackingEngine: Sendable {
             return verification.notExecutedTrackers.map {
                 VASTBeacon(kind: .verificationNotExecuted(reason), url: $0, adID: ad.id)
             }
+        }
+    }
+
+    /// The only viewability outcome this player can honestly claim.
+    ///
+    /// §3.6 offers three, and a player with no viewability measurement can report
+    /// exactly one of them. Sending nothing at all is the tempting option and the
+    /// wrong one: an unmeasured impression left silent is counted as measured by
+    /// whoever asked.
+    private func viewabilityUndetermined() -> [VASTBeacon] {
+        guard !measurementWillRun, let asked = ad.viewableImpression else { return [] }
+        return asked.viewUndetermined.map {
+            VASTBeacon(kind: .viewUndetermined, url: $0, adID: ad.id)
+        }
+    }
+
+    /// `<CustomClick>` — an interaction the host saw and the engine cannot.
+    public mutating func reportCustomClick() -> [VASTBeacon] {
+        guard !isFinished else { return [] }
+        return ad.linear.customClicks.map {
+            VASTBeacon(kind: .customClick, url: $0, adID: ad.id)
         }
     }
 

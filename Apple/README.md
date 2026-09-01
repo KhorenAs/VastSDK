@@ -10,7 +10,7 @@ Sources/
   Harness/    runnable logic harness: `swift run Harness`
 Examples/
   VASTDemo.xcodeproj    SwiftUIDemo · UIKitDemo · AppKitDemo
-Tests/        148 tests
+Tests/        229 tests
 Reference/    IAB VAST 4.0/4.1/4.2 XSD schemas
 ```
 
@@ -139,7 +139,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 148 tests
+swift test                  # 229 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 

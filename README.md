@@ -4,7 +4,7 @@ A native VAST 4.3 linear-video ad SDK. No Google IMA, no VPAID, no WebView.
 
 | Platform | Status |
 |---|---|
-| [Apple](Apple/) — iOS · tvOS · macOS | Implemented. 148 tests. |
+| [Apple](Apple/) — iOS · tvOS · macOS | Implemented. 229 tests. |
 | [Android](Android/) | Not started. |
 | [Web](Web/) | Not started. |
 
@@ -38,7 +38,7 @@ Working on the SDK itself:
 
 ```bash
 swift build                 # or: cd Apple && swift build
-swift test                  # 148 tests
+swift test                  # 229 tests
 ```
 
 The manifest at the repository root and the one in `Apple/` describe the same

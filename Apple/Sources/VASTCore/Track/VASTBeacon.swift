@@ -21,6 +21,13 @@ public struct VASTBeacon: Sendable, Equatable {
         /// code (§3.16). Silence would let the vendor count the session as
         /// measured, so the reason is reported rather than withheld.
         case verificationNotExecuted(VASTAd.Verification.NotExecutedReason)
+        /// `<ViewUndetermined>` (§3.6): the response asked about viewability and
+        /// this player cannot measure it. The same reasoning as above — silence
+        /// would let a buyer treat an unmeasured impression as a measured one.
+        case viewUndetermined
+        /// `<CustomClick>` (§3.10.3): an interaction the host reported that opens
+        /// nothing, as distinct from a click-through.
+        case customClick
     }
 
     public let kind: Kind

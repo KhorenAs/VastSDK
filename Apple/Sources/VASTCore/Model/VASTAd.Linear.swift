@@ -17,6 +17,10 @@ public extension VASTAd {
         public let mediaFiles: [MediaFile]
         public let clickThrough: URL?
         public let clickTracking: [URL]
+        /// `<CustomClick>` (§3.10.3) — trackers for a click the player reports
+        /// without opening anything, as distinct from `<ClickTracking>`, which
+        /// accompanies a click-through. Real tags send both.
+        public let customClicks: [URL]
         public let trackingEvents: [TrackingEvent: [URL]]
         /// `<Tracking event="progress" offset="...">` — decides whether a skipped
         /// ad still counts as viewed (§3.14.1).
@@ -28,6 +32,7 @@ public extension VASTAd {
             mediaFiles: [MediaFile] = [],
             clickThrough: URL? = nil,
             clickTracking: [URL] = [],
+            customClicks: [URL] = [],
             trackingEvents: [TrackingEvent: [URL]] = [:],
             progressEvents: [ProgressEvent] = []
         ) {
@@ -36,6 +41,7 @@ public extension VASTAd {
             self.mediaFiles = mediaFiles
             self.clickThrough = clickThrough
             self.clickTracking = clickTracking
+            self.customClicks = customClicks
             self.trackingEvents = trackingEvents
             self.progressEvents = progressEvents
         }

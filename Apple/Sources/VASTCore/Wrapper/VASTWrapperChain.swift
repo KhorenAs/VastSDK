@@ -38,6 +38,8 @@ public struct VASTWrapperChain: Sendable {
     private var verifications: [VASTAd.Verification] = []
     /// `<Ad id>` of each Wrapper crossed, in the order they were crossed.
     private var wrapperAdIDs: [String] = []
+    /// Viewability URIs the Wrappers asked for, kept alongside the InLine's.
+    private var viewableImpression: VASTAd.ViewableImpression?
     private var allowMultipleAds = false
 
     /// §3.19.1: "the player is only required to accept five wrappers".
@@ -149,6 +151,17 @@ public struct VASTWrapperChain: Sendable {
         }
     }
 
+    private mutating func absorb(viewableImpression incoming: VASTAd.ViewableImpression?) {
+        guard let incoming else { return }
+        let existing = viewableImpression
+        viewableImpression = VASTAd.ViewableImpression(
+            id: existing?.id ?? incoming.id,
+            viewable: (existing?.viewable ?? []) + incoming.viewable,
+            notViewable: (existing?.notViewable ?? []) + incoming.notViewable,
+            viewUndetermined: (existing?.viewUndetermined ?? []) + incoming.viewUndetermined
+        )
+    }
+
     /// The `<Error>` URIs of the first ad that was filled but not playable here.
     private func firstUnplayableCreative(in document: VASTDocument) -> [URL]? {
         for entry in document.entries {
@@ -160,6 +173,7 @@ public struct VASTWrapperChain: Sendable {
     private mutating func absorb(_ wrapper: VASTDocument.Wrapper, adID: String) {
         impressions += wrapper.impressions
         accumulatedErrors += wrapper.errors
+        absorb(viewableImpression: wrapper.viewableImpression)
         clickTracking += wrapper.clickTracking
         extensions += wrapper.extensions
         absorb(verifications: wrapper.verifications)
@@ -197,6 +211,7 @@ public struct VASTWrapperChain: Sendable {
                 // therefore wins over anything a calling Wrapper supplied.
                 clickThrough: ad.linear.clickThrough ?? clickThrough,
                 clickTracking: ad.linear.clickTracking + clickTracking,
+                customClicks: ad.linear.customClicks,
                 trackingEvents: merged,
                 progressEvents: ad.linear.progressEvents
             ),
@@ -204,8 +219,35 @@ public struct VASTWrapperChain: Sendable {
             errors: ad.errors + accumulatedErrors,
             extensions: ad.extensions + extensions,
             adVerifications: mergedVerifications(for: ad),
-            wrapperAdIDs: wrapperAdIDs
+            wrapperAdIDs: wrapperAdIDs,
+            // Carried, not rebuilt. Reconstructing the ad without these silently
+            // dropped every one of them for any response that came through a
+            // Wrapper — which is most of them — and they are exactly the fields a
+            // reporting pipeline needs.
+            adServingID: ad.adServingID,
+            universalAdIDs: ad.universalAdIDs,
+            viewableImpression: mergedViewableImpression(for: ad),
+            icons: ad.icons,
+            advertiser: ad.advertiser,
+            pricing: ad.pricing,
+            categories: ad.categories,
+            expires: ad.expires
         )
+    }
+
+    /// A Wrapper may ask about viewability too (§3.6), and both are owed an
+    /// answer: an intermediary that wanted to hear about it does not stop wanting
+    /// because the InLine wanted to as well.
+    private func mergedViewableImpression(for ad: VASTAd) -> VASTAd.ViewableImpression? {
+        guard viewableImpression != nil || ad.viewableImpression != nil else { return nil }
+        let inLine = ad.viewableImpression
+        let merged = VASTAd.ViewableImpression(
+            id: inLine?.id ?? viewableImpression?.id,
+            viewable: (inLine?.viewable ?? []) + (viewableImpression?.viewable ?? []),
+            notViewable: (inLine?.notViewable ?? []) + (viewableImpression?.notViewable ?? []),
+            viewUndetermined: (inLine?.viewUndetermined ?? []) + (viewableImpression?.viewUndetermined ?? [])
+        )
+        return merged.isEmpty ? nil : merged
     }
 
     /// The InLine's own verifications first — it is closest to the creative —

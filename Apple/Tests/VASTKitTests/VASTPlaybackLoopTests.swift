@@ -351,6 +351,8 @@ private extension VASTPlaybackLoopTests {
         case .clickTracking: "click"
         case .error(let error): "error\(error.rawValue)"
         case .verificationNotExecuted: "notExecuted"
+        case .viewUndetermined: "viewUndetermined"
+        case .customClick: "customClick"
         }
     }
 

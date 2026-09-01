@@ -46,6 +46,10 @@ public extension VASTDocument {
         /// Verification vendors are usually injected by an intermediary rather
         /// than the advertiser, so a Wrapper carrying them is the common case.
         public let verifications: [VASTAd.Verification]
+        /// A Wrapper may ask about viewability on its own account (§3.6), and an
+        /// intermediary that wanted to hear does not stop wanting because the
+        /// InLine wanted to as well.
+        public let viewableImpression: VASTAd.ViewableImpression?
         /// Default `true` (§3.19).
         public let followAdditionalWrappers: Bool
         /// Default `false` (§3.19).

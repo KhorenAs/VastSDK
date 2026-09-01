@@ -35,6 +35,32 @@ public struct VASTAd: Sendable, Identifiable {
     /// the rest of the Wrapper once the chain is flattened.
     public let wrapperAdIDs: [String]
 
+    /// `<AdServingId>` (§3.4). Required from VAST 4.1.
+    ///
+    /// The value both sides quote when their counts disagree: unique to this
+    /// response, from this server, for this request. Without it a discrepancy
+    /// conversation is two parties comparing timestamps.
+    public let adServingID: String?
+    /// `<UniversalAdId>` (§3.7.1). Required in VAST 4 — one per `<Creative>`, and
+    /// the only identifier that means the same thing to both sides.
+    public let universalAdIDs: [UniversalAdID]
+    /// `<ViewableImpression>` (§3.6), if the response asked to hear about
+    /// viewability.
+    public let viewableImpression: ViewableImpression?
+    /// `<Icon>` (§3.15) — AdChoices, in practice. Parsed and handed over; drawing
+    /// it belongs to whoever owns the ad UI.
+    public let icons: [Icon]
+    /// `<Advertiser>` (§3.9) — who the ad is for.
+    public let advertiser: String?
+    /// `<Pricing>` (§3.8) — what the impression cost, as the server states it.
+    public let pricing: Pricing?
+    /// `<Category>` (§3.5) — the advertiser's industry.
+    public let categories: [Category]
+    /// `<Expires>` (§3.4) — how long this response may be held before it stops
+    /// being worth playing, in seconds. Only meaningful to a host that caches
+    /// responses; this SDK plays them as they arrive.
+    public let expires: TimeInterval?
+
     public init(
         id: String,
         sequence: Int? = nil,
@@ -45,7 +71,15 @@ public struct VASTAd: Sendable, Identifiable {
         errors: [URL] = [],
         extensions: [Extension] = [],
         adVerifications: [Verification] = [],
-        wrapperAdIDs: [String] = []
+        wrapperAdIDs: [String] = [],
+        adServingID: String? = nil,
+        universalAdIDs: [UniversalAdID] = [],
+        viewableImpression: ViewableImpression? = nil,
+        icons: [Icon] = [],
+        advertiser: String? = nil,
+        pricing: Pricing? = nil,
+        categories: [Category] = [],
+        expires: TimeInterval? = nil
     ) {
         self.id = id
         self.sequence = sequence
@@ -57,6 +91,14 @@ public struct VASTAd: Sendable, Identifiable {
         self.extensions = extensions
         self.adVerifications = adVerifications
         self.wrapperAdIDs = wrapperAdIDs
+        self.adServingID = adServingID
+        self.universalAdIDs = universalAdIDs
+        self.viewableImpression = viewableImpression
+        self.icons = icons
+        self.advertiser = advertiser
+        self.pricing = pricing
+        self.categories = categories
+        self.expires = expires
     }
 
     /// Whether this is a Skippable Linear Ad: the creative declared a
