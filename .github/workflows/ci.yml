@@ -42,7 +42,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        working-directory: Apple
         run: |
           xcodebuild -scheme VASTKit \
             -destination 'generic/platform=${{ matrix.platform }}' \
@@ -64,7 +63,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Build
-        working-directory: Apple/Examples
+        working-directory: Examples
         # No signing identity on a runner, and none needed to prove the code
         # compiles for the platform.
         run: |

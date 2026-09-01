@@ -2,16 +2,13 @@
 
 import PackageDescription
 
-// The Apple SDK lives in Apple/, alongside the Android and Web projects, but
-// SwiftPM only ever looks for a manifest at the repository root — so a
-// dependency on this repo's URL would not resolve without this file.
+// One manifest, in the one place SwiftPM looks for it.
 //
-// It describes the same targets as Apple/Package.swift, reaching into Apple/ by
-// path. That manifest stays where it is: Examples/VASTDemo.xcodeproj references
-// it as a local package, and working inside Apple/ should not require thinking
-// about the monorepo around it. Changing a target in one means changing it in
-// both.
-
+// There were two: this and Apple/Package.swift, describing the same targets, with
+// a note in the README saying that changing a target meant changing both. That
+// note was the tell. The platform folder it existed to serve is gone — Android
+// and Web get their own repositories rather than empty directories here — so the
+// layout is now the conventional one and the manifest needs no `path:` at all.
 let package = Package(
     name: "VASTSDK",
     defaultLocalization: "en",
@@ -27,35 +24,29 @@ let package = Package(
     targets: [
         // Pure logic. Deliberately does NOT link AVFoundation or SwiftUI, so the
         // parsing and tracking rules can never take a dependency on a live player.
-        .target(name: "VASTCore", path: "Apple/Sources/VASTCore"),
+        .target(name: "VASTCore"),
 
         // Player, networking and UI binding.
-        .target(name: "VASTKit", dependencies: ["VASTCore"], path: "Apple/Sources/VASTKit",
-            // The ad UI's own words, localised in the package: a host that
-            // configures nothing should not get an English skip control.
+        .target(
+            name: "VASTKit",
+            dependencies: ["VASTCore"],
+            // The ad UI's own words, localised in the package, and the privacy
+            // manifest: a host that configures nothing should get neither an
+            // English skip control nor an undeclared SDK.
             resources: [.process("Resources")]
         ),
 
         // Runnable logic harness for VASTCore: `swift run Harness`.
         // Drives the tracking engine with scripted ticks — no player, no network.
-        .executableTarget(
-            name: "Harness",
-            dependencies: ["VASTCore", "VASTKit"],
-            path: "Apple/Sources/Harness"
-        ),
+        .executableTarget(name: "Harness", dependencies: ["VASTCore", "VASTKit"]),
 
         .testTarget(
             name: "VASTCoreTests",
             dependencies: ["VASTCore"],
-            path: "Apple/Tests/VASTCoreTests",
             resources: [.copy("Fixtures")]
         ),
 
-        .testTarget(
-            name: "VASTKitTests",
-            dependencies: ["VASTKit"],
-            path: "Apple/Tests/VASTKitTests"
-        ),
+        .testTarget(name: "VASTKitTests", dependencies: ["VASTKit"]),
     ],
     swiftLanguageModes: [.v6]
 )
