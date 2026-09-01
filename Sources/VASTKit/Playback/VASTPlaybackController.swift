@@ -40,14 +40,15 @@ final class VASTPlaybackController {
     /// True while the app is not frontmost, or audio is interrupted. The stall
     /// watchdog is suspended for that time: a backgrounded ad is not a broken one.
     private(set) var isSuspendedBySystem = false
-    /// True while the host has paused the ad through `VASTAdSession.pause()`.
+    /// True while the ad is held paused on someone's behalf — the host through
+    /// `VASTAdSession.pause()`, or a viewer through a control the SDK does not
+    /// own, such as the one in the Picture in Picture window.
     ///
     /// `resumeIfNeeded()` re-issues playback on every tick because iOS leaves
-    /// `rate` at 0 after backgrounding and never restarts on its own. From the
-    /// player alone that is indistinguishable from someone deliberately pausing,
-    /// so an ad the host paused was resumed within one tick — the viewer could
-    /// not pause an ad at all. The difference is not observable; it has to be
-    /// stated, which is why pausing goes through the session.
+    /// `rate` at 0 after backgrounding and never restarts on its own, so without
+    /// this flag an ad the viewer paused was resumed within one tick. What tells
+    /// the two apart is `timeControlStatus` rather than `rate` — see
+    /// `observePlaybackStatus()`.
     private(set) var isPausedByUser = false
 
     /// Set when the break is being abandoned. Everything in flight has to notice:
@@ -56,6 +57,15 @@ final class VASTPlaybackController {
     private(set) var isAborted = false
 
     private var observers: [any NSObjectProtocol] = []
+    private var statusObservation: NSKeyValueObservation?
+
+    /// Playback started or stopped without this controller asking for it.
+    ///
+    /// Only that it happened; what it means is the session's to decide, because
+    /// deciding needs what the session knows — whether an ad is on screen, and
+    /// whether the Picture in Picture window is open, where a stop can only have
+    /// come from the viewer.
+    var didObservePlaybackChange: ((Bool) -> Void)?
 
     /// Assets warmed ahead of time, by URL.
     ///
@@ -67,6 +77,7 @@ final class VASTPlaybackController {
     init(player: AVPlayer) {
         self.player = player
         observeSystemInterruptions()
+        observePlaybackStatus()
     }
 
     /// Explicit teardown rather than `deinit`: observer tokens are not
@@ -77,6 +88,9 @@ final class VASTPlaybackController {
         warmed.removeAll()
         observers.forEach(NotificationCenter.default.removeObserver)
         observers.removeAll()
+        statusObservation?.invalidate()
+        statusObservation = nil
+        didObservePlaybackChange = nil
     }
 
     /// Starts fetching what the break will need next, while it plays what it has.
@@ -216,6 +230,44 @@ final class VASTPlaybackController {
             }
         })
         #endif
+    }
+
+    /// Watches `timeControlStatus`, which is what makes this possible at all.
+    ///
+    /// A rate of zero is buffering and pausing at the same time, so from `rate`
+    /// alone the SDK could not tell a viewer's pause from a slow segment — and
+    /// guessing wrong either drops a §3.14.1 `pause` or invents one on every
+    /// stall. That is why pausing had to be *stated* through the session. The
+    /// status separates the two cases the rate conflates:
+    /// `.waitingToPlayAtSpecifiedRate` is the buffer, `.paused` is somebody's
+    /// decision — and a decision the session did not make is one worth reporting.
+    private func observePlaybackStatus() {
+        statusObservation = player.observe(
+            \.timeControlStatus, options: [.new]
+        ) { [weak self] _, change in
+            guard let status = change.newValue else { return }
+            // Hopped rather than assumed: KVO is delivered on whichever thread
+            // changed the value, and `AVPlayer` does not promise that is the
+            // main one.
+            Task { @MainActor in self?.noteTimeControl(status) }
+        }
+    }
+
+    private func noteTimeControl(_ status: AVPlayer.TimeControlStatus) {
+        guard wantsPlayback, !isAborted else { return }
+        switch status {
+        case .playing:
+            didObservePlaybackChange?(true)
+        case .paused:
+            // Ours, and reported when it was made. Reporting it twice would put
+            // two `pause` events on one pause.
+            guard !isPausedByUser else { return }
+            didObservePlaybackChange?(false)
+        case .waitingToPlayAtSpecifiedRate:
+            break
+        @unknown default:
+            break
+        }
     }
 
     /// Restarts playback if the ad should be running and nothing else stopped it.

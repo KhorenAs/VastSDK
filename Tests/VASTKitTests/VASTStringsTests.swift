@@ -15,6 +15,7 @@ final class VASTStringsTests: XCTestCase {
     /// Every string the ad surface can put on screen.
     private static let keys = [
         "ad.badge", "ad.badge.pod", "ad.countdown", "skip.action", "skip.countdown",
+        "nowplaying.title",
     ]
 
     func testEveryLanguageCarriesEveryString() throws {

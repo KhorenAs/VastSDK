@@ -23,6 +23,12 @@ public extension VASTAdSession {
         var restoresPlayerItem: Bool { get }
         var skipPresentation: SkipPresentation { get }
         var clickPresentation: ClickPresentation { get }
+        /// Whether the ad may follow the content into the Picture in Picture
+        /// window, where the ad surface cannot go with it.
+        var pictureInPicture: PictureInPicturePolicy { get }
+        /// What the system's Now Playing controls show, and allow, while an ad
+        /// is on the player.
+        var nowPlaying: NowPlayingPolicy { get }
         /// `nil` uses the built-in `AVPlayer` observer clock.
         var clock: (any iVASTClock)? { get }
         var transport: (any iVASTBeaconTransport)? { get }
@@ -63,6 +69,53 @@ public extension VASTAdSession {
         case disabled
     }
 
+    /// Whether an ad may play in the Picture in Picture window.
+    ///
+    /// The window shows the player layer and the system's own transport
+    /// controls; the ad surface — skip control, badge, click layer — is a view
+    /// in the app and stays behind. What that costs is smaller than it first
+    /// looks: tapping the window returns to the app, where the whole surface is
+    /// where it was. The skip control is a tap further away, not gone.
+    ///
+    /// So the default is to leave the window alone. A viewer who asked for
+    /// Picture in Picture asked for it, and Picture in Picture follows the
+    /// `AVPlayerLayer` rather than the item — a host that supports it at all
+    /// carries the creative there whether or not anyone decided to. The other
+    /// two cases are for players that must keep an ad where its controls are.
+    enum PictureInPicturePolicy: Sendable, Equatable {
+        /// The ad plays in the window, like the content it interrupted. The
+        /// default. The delegate is told when a skip control comes due while
+        /// the viewer is out there and cannot see it.
+        case allowed
+        /// The window stays, but entering it pauses the ad — reported as §3.14.1
+        /// `pause` — and leaving it resumes. Nothing plays unwatched.
+        case pausesAd
+        /// The window closes for the length of the break, and automatic entry is
+        /// switched off while it runs. The strictest reading of §2.3: the ad
+        /// plays where its controls are or it does not play.
+        case suspended
+    }
+
+    /// What the system's Now Playing transport does during a break.
+    ///
+    /// Control Centre, the lock screen, AirPods and CarPlay all draw from the
+    /// same two process-wide objects, and they are on offer because Picture in
+    /// Picture needed the `audio` background mode to exist at all. Their seek
+    /// and skip controls are the window's scrubber again, in a place the host
+    /// cannot see, and their title is the content's while an ad is playing.
+    enum NowPlayingPolicy: Sendable, Equatable {
+        /// Locks the controls that would seek or skip the creative, and
+        /// describes the ad while it plays. Both are put back when the break
+        /// ends. The default: the alternative is a lock screen naming a film
+        /// that is not the thing making the sound.
+        case describesAd
+        /// Locks the controls, and leaves the host's Now Playing information
+        /// exactly as it is.
+        case locksControls
+        /// Neither. The system controls are the host's, seeking included.
+        case untouched
+    }
+
     struct Configuration: iConfiguration {
 
         public var maxWrapperDepth: Int
@@ -71,6 +124,8 @@ public extension VASTAdSession {
         public var restoresPlayerItem: Bool
         public var skipPresentation: SkipPresentation
         public var clickPresentation: ClickPresentation
+        public var pictureInPicture: PictureInPicturePolicy
+        public var nowPlaying: NowPlayingPolicy
         public var clock: (any iVASTClock)?
         public var transport: (any iVASTBeaconTransport)?
         public var loader: (any iVASTResourceLoader)?
@@ -86,6 +141,8 @@ public extension VASTAdSession {
             restoresPlayerItem: Bool = true,
             skipPresentation: SkipPresentation = .sdk,
             clickPresentation: ClickPresentation = .surface,
+            pictureInPicture: PictureInPicturePolicy = .allowed,
+            nowPlaying: NowPlayingPolicy = .describesAd,
             clock: (any iVASTClock)? = nil,
             transport: (any iVASTBeaconTransport)? = nil,
             loader: (any iVASTResourceLoader)? = nil,
@@ -97,6 +154,8 @@ public extension VASTAdSession {
             self.restoresPlayerItem = restoresPlayerItem
             self.skipPresentation = skipPresentation
             self.clickPresentation = clickPresentation
+            self.pictureInPicture = pictureInPicture
+            self.nowPlaying = nowPlaying
             self.clock = clock
             self.transport = transport
             self.loader = loader
@@ -109,8 +168,8 @@ public extension VASTAdSession {
 ///
 /// A protocol requirement with no default is a source break for every host that
 /// already wrote a configuration type, over settings most of them will never
-/// touch. These two are exactly that: a budget with a sensible value, and values
-/// only some hosts can supply at all.
+/// touch. These are exactly that: a budget with a sensible value, values only
+/// some hosts can supply at all, and a window most hosts do not have.
 public extension VASTAdSession.iConfiguration {
 
     /// Ten seconds for a whole response, however many Wrappers it takes.
@@ -119,4 +178,12 @@ public extension VASTAdSession.iConfiguration {
     /// Nothing, which reports `-1` for each — honest, and what a host that never
     /// mentioned them means.
     var macroValues: VASTMacroValues { VASTMacroValues() }
+
+    /// Leave the window alone, which is what a host that never mentioned Picture
+    /// in Picture means — and what a viewer who opened it asked for.
+    var pictureInPicture: VASTAdSession.PictureInPicturePolicy { .allowed }
+
+    /// Take the seek controls off the lock screen for the break and say what is
+    /// playing, which is what a host that never thought about it wants.
+    var nowPlaying: VASTAdSession.NowPlayingPolicy { .describesAd }
 }

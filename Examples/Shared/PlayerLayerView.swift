@@ -16,6 +16,12 @@ import AVFoundation
 struct PlayerLayerView {
     let player: AVPlayer
     var gravity: AVLayerVideoGravity = .resizeAspect
+    /// Handed the layer once it exists.
+    ///
+    /// Picture in Picture is built from an `AVPlayerLayer`, not from an
+    /// `AVPlayer`, so a host that never exposes its layer cannot offer the window
+    /// at all — and the SDK cannot be told about a window it is not offered.
+    var onLayer: ((AVPlayerLayer) -> Void)?
 }
 
 #if os(macOS)
@@ -27,6 +33,7 @@ extension PlayerLayerView: NSViewRepresentable {
     func makeNSView(context: Context) -> PlayerHostView {
         let view = PlayerHostView()
         view.attach(player: player, gravity: gravity)
+        onLayer?(view.playerLayer)
         return view
     }
 
@@ -37,7 +44,7 @@ extension PlayerLayerView: NSViewRepresentable {
 
 final class PlayerHostView: NSView {
 
-    private let playerLayer = AVPlayerLayer()
+    let playerLayer = AVPlayerLayer()
 
     override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
@@ -70,6 +77,7 @@ extension PlayerLayerView: UIViewRepresentable {
     func makeUIView(context: Context) -> PlayerHostView {
         let view = PlayerHostView()
         view.attach(player: player, gravity: gravity)
+        onLayer?(view.playerLayer)
         return view
     }
 
@@ -82,7 +90,7 @@ final class PlayerHostView: UIView {
 
     override class var layerClass: AnyClass { AVPlayerLayer.self }
 
-    private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+    var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
 
     override init(frame: CGRect) {
         super.init(frame: frame)

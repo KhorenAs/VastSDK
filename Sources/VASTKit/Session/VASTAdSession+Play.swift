@@ -50,7 +50,20 @@ extension VASTAdSession {
 
         let playback = VASTPlaybackController(player: player)
         activePlayback = playback
+        playback.didObservePlaybackChange = { [weak self] isPlaying in
+            self?.noteExternalPlayback(isPlaying: isPlaying)
+        }
         transactionID = UUID().uuidString
+        // Before anything plays: under `.suspended` the window has to be closed
+        // while the content is still the thing in it, not after the creative has
+        // already appeared there.
+        pictureInPicture?.adBreakDidBegin()
+
+        // Likewise the system transport: the seek controls have to be gone
+        // before a creative is what they would be seeking.
+        let nowPlaying = VASTNowPlayingController(policy: configuration.nowPlaying)
+        self.nowPlaying = nowPlaying
+        nowPlaying.adBreakDidBegin()
         defer {
             if configuration.restoresPlayerItem {
                 // An abandoned break must not hand the content back *playing*:
@@ -60,6 +73,9 @@ extension VASTAdSession {
             }
             playback.invalidate()
             if activePlayback === playback { activePlayback = nil }
+            pictureInPicture?.adBreakDidEnd()
+            nowPlaying.adBreakDidEnd()
+            if self.nowPlaying === nowPlaying { self.nowPlaying = nil }
             self.scheduler = nil
             currentAd = nil
             canSkip = false
@@ -112,7 +128,7 @@ extension VASTAdSession {
 
     private func playOne(_ ad: VASTAd, using playback: VASTPlaybackController) async -> Outcome {
         currentAd = ad
-        resetSkipControlReport()
+        resetComplianceReports()
         canSkip = false
         timeUntilSkip = ad.linear.resolvedSkipOffset()
         // Seed the countdown from <Duration> so the overlay reads the creative's
@@ -167,6 +183,12 @@ extension VASTAdSession {
         state = .playing
         verifyClickPath(for: ad)
         verifyHostDrawnUI(for: ad)
+        // A window that was already open raises no callback of its own, so the
+        // policy is re-asked here rather than only on the way in.
+        pictureInPicture?.adDidStart()
+        // `<Duration>` rather than the player's: the item has only just become
+        // playable, and the declared length is what the countdown is using too.
+        nowPlaying?.adDidStart(ad, duration: ad.linear.duration)
         // Before the impression: a measurement session has to exist for the
         // impression it is being asked to attest to.
         measurement?.begin(VASTMeasurementContext(ad: ad, adView: attachedSurface))

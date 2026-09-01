@@ -34,6 +34,12 @@ public final class VASTAdSession: ObservableObject {
     /// Seconds until the skip control unlocks; `nil` when the ad is not skippable.
     @Published public internal(set) var timeUntilSkip: TimeInterval?
 
+    /// Whether the player is currently in the Picture in Picture window.
+    ///
+    /// Only ever true when the host registered a controller — the SDK has no
+    /// other way to know, and does not guess. See `registerPictureInPicture`.
+    @Published public internal(set) var isInPictureInPicture = false
+
     /// Whether the host is willing to draw the whole ad UI itself when a
     /// response asks it to.
     ///
@@ -52,6 +58,31 @@ public final class VASTAdSession: ObservableObject {
     ///
     /// `suppressesAdUI` is the answer for the ad currently playing.
     @Published public var isHiddenUi = false
+
+    /// Whether a host's own Picture in Picture control should be offered right
+    /// now.
+    ///
+    /// False while a break is running under `.suspended`, and true the rest of
+    /// the time. Worth binding a control to, because AVKit gives no way to refuse
+    /// a start: `canStartPictureInPictureAutomaticallyFromInline` covers only
+    /// automatic entry, and the delegate's `willStart` cannot cancel. A button
+    /// left enabled under `.suspended` therefore opens the window and has it
+    /// closed again a moment later — correct, and visibly clumsy. Only the host
+    /// can hide its own control, so this is the SDK answering rather than each
+    /// host working it out.
+    ///
+    /// The other policies leave the window to the viewer, so it stays true.
+    ///
+    /// Derived from `state` rather than from the break's own internals, so that
+    /// it changes when a published value does and a SwiftUI control bound to it
+    /// actually redraws.
+    public var permitsPictureInPicture: Bool {
+        guard configuration.pictureInPicture == .suspended else { return true }
+        return switch state {
+        case .loading, .playing, .paused: false
+        case .idle, .finished: true
+        }
+    }
 
     /// Whether the ad on screen right now must be drawn by the host: the host
     /// allowed it *and* this response asked for it.
@@ -99,6 +130,14 @@ public final class VASTAdSession: ObservableObject {
     /// The controller driving the current break, so it can be aborted from
     /// outside the loop that owns it.
     var activePlayback: VASTPlaybackController?
+    /// The system's Now Playing controls, held for the length of a break. Built
+    /// per break rather than per session: what it holds is a snapshot, and a
+    /// snapshot outside a break is a snapshot of nothing.
+    var nowPlaying: VASTNowPlayingController?
+    /// The host's Picture in Picture controller, once it has been registered.
+    /// Held for the life of the session rather than the break: the window can be
+    /// opened before a break starts, and the policy has to be there when it is.
+    var pictureInPicture: VASTPictureInPictureCoordinator?
     /// Bumped by `stop()`. Work that was already in flight compares the token it
     /// started with and discards its result if the session has moved on.
     ///
@@ -135,6 +174,9 @@ public final class VASTAdSession: ObservableObject {
     /// One complaint per ad: the control is re-measured on every layout pass, and
     /// a warning repeated forty times a second helps nobody.
     private var reportedSkipControlProblem = false
+    /// The same, for the window. Entering and leaving it repeatedly during one ad
+    /// is one mistake, not one per trip.
+    private var reportedPictureInPictureProblem = false
 
     func noteSurface(size: CGSize) {
         surfacePresence.update(size: size)
@@ -157,8 +199,9 @@ public final class VASTAdSession: ObservableObject {
     }
 
     /// Each ad in a pod gets its own control, and its own chance to be wrong.
-    func resetSkipControlReport() {
+    func resetComplianceReports() {
         reportedSkipControlProblem = false
+        reportedPictureInPictureProblem = false
     }
 
     /// Reported when the skip control is laid out, which is the only moment its
@@ -217,6 +260,11 @@ public final class VASTAdSession: ObservableObject {
     /// moment it actually matters: the control is due, so it had better be
     /// somewhere a viewer can reach.
     func verifySkipSurface(for ad: VASTAd) {
+        // First, and before every guard below: a surface can be present, sized
+        // and pinned by `attach(to:)` — passing all of them — and still not be
+        // where the ad is.
+        reportPictureInPictureUnreachableUI()
+
         guard configuration.skipPresentation == .sdk, ad.isSkippable else { return }
         // Already reported at the start of the ad, and no control was drawn to
         // measure — complaining again when the offset elapses says nothing new.
@@ -230,6 +278,65 @@ public final class VASTAdSession: ObservableObject {
         // probe misread a surface it had in fact been given.
         VASTLog.compliance.warning("skip control unavailable: \(diagnosis, privacy: .public)")
         delegate?.session(self, skipControlUnavailableFor: ad, reason: diagnosis)
+    }
+
+    /// The window opened or closed. Publishes it, tells the delegate, and decides
+    /// what the running break does about it.
+    ///
+    /// - Returns: the part of the answer only the coordinator can carry out, since
+    ///   the controller is not the session's to hold.
+    @discardableResult
+    func notePictureInPicture(isActive: Bool) -> PictureInPicturePolicy.Reaction {
+        if isInPictureInPicture != isActive {
+            isInPictureInPicture = isActive
+            delegate?.session(self, pictureInPictureDidChange: isActive)
+        }
+
+        // Outside a break there is no ad to protect and no policy to apply: the
+        // window is the host's own, and the SDK has no business closing it.
+        guard currentAd != nil, activePlayback != nil else { return .ignore }
+
+        let reaction = configuration.pictureInPicture.reaction(toPictureInPictureActive: isActive)
+        switch reaction {
+        case .pauseAd:
+            pause()
+        case .resumeAd:
+            resume()
+        case .reportUnreachableUI:
+            reportPictureInPictureUnreachableUI()
+        case .stopPictureInPicture, .ignore:
+            break
+        }
+        return reaction
+    }
+
+    /// What `.allowed` costs, said out loud — and only when it costs anything.
+    ///
+    /// Reported at the moment the skip control comes due with the viewer out in
+    /// the window, which is the only moment §2.3 promises something they cannot
+    /// see. Not when the window opens: before `skipoffset` elapses no control is
+    /// owed, and warning then would put a line in the log for every ad anyone
+    /// ever watched in Picture in Picture.
+    ///
+    /// The click path is deliberately not reported. Unlike tvOS, where a
+    /// transparent layer can never take focus, tapping the window returns to the
+    /// app and the click layer is where it always was — one tap further, not
+    /// unreachable.
+    private func reportPictureInPictureUnreachableUI() {
+        guard isInPictureInPicture, canSkip, !reportedPictureInPictureProblem,
+              let ad = currentAd, ad.isSkippable,
+              configuration.skipPresentation == .sdk, !suppressesAdUI
+        else { return }
+        reportedPictureInPictureProblem = true
+
+        let reason = """
+        the skip control came due while the ad was playing in the Picture in \
+        Picture window, which draws the player layer and nothing else — the \
+        viewer has to come back to the app to reach it. Set pictureInPicture to \
+        .pausesAd or .suspended if that is not acceptable for your inventory.
+        """
+        VASTLog.compliance.warning("skip control not on screen: \(reason, privacy: .public)")
+        delegate?.session(self, skipControlUnavailableFor: ad, reason: reason)
     }
 
     public init(player: AVPlayer, configuration: any iConfiguration = Configuration()) {
@@ -455,7 +562,59 @@ public final class VASTAdSession: ObservableObject {
         playback.pauseByUser()
         report(.pause)
         state = .paused
+        // The lock screen's own clock runs on the rate it was last given, so a
+        // pause it is not told about goes on counting.
+        nowPlaying?.notePlayback(isPlaying: false, elapsed: lastTick?.adTime ?? 0)
     }
+
+    /// Playback stopped or started without the session asking.
+    ///
+    /// The player is the host's, and the ad on it can be stopped by things the
+    /// SDK does not own: the Picture in Picture window's own pause button, or a
+    /// host reaching for `AVPlayer` directly. Both used to be invisible — the
+    /// `pause` and `resume` §3.14.1 asks for went unsent, `state` went on
+    /// claiming the ad was playing, and any measurement layer, which reads the
+    /// beacons, was told the same thing.
+    ///
+    /// Routed through `pause()` and `resume()` rather than reported separately,
+    /// so a stop the viewer made and a stop the host made produce the same
+    /// beacons in the same order. Both guard on the state they need, which is
+    /// what makes a spurious transition a no-op rather than a stray event.
+    func noteExternalPlayback(isPlaying: Bool) {
+        guard let playback = activePlayback else { return }
+
+        guard !isPlaying else {
+            resume()
+            return
+        }
+
+        // The creative running out stops the player like anything else does.
+        // Reporting `pause` after `complete` is a sequence no ad server should
+        // ever be sent, so the end of the ad is not a pause.
+        guard let engine = activeEngine, !engine.isFinished else { return }
+        guard remainingTime > Self.endOfCreativeMargin else { return }
+
+        // Leaving the app stops decoding too, and that is the system, not the
+        // viewer — it lifts on its own and `resumeIfNeeded()` restarts it. The
+        // exception is the window: playback carries on in it while the app is
+        // away, so a stop there can only be the viewer's own control.
+        guard !playback.isSuspendedBySystem || adMayPlayInPictureInPicture else { return }
+        pause()
+    }
+
+    /// Whether the ad is in the Picture in Picture window *and* meant to be
+    /// playing there. Under `.suspended` it is neither, and the pause seen while
+    /// the window closes is the closing, not a viewer.
+    private var adMayPlayInPictureInPicture: Bool {
+        isInPictureInPicture && configuration.pictureInPicture != .suspended
+    }
+
+    /// How close to the end of a creative a stop stops being a pause.
+    ///
+    /// Wider than the engine's own completion margin and than one clock tick,
+    /// because this has to hold whichever of the two arrives first — the item's
+    /// end notification or the player's rate reaching zero.
+    static let endOfCreativeMargin: TimeInterval = 0.5
 
     /// Resumes an ad paused by `pause()`, and reports that too.
     ///
@@ -466,6 +625,7 @@ public final class VASTAdSession: ObservableObject {
         playback.resumeByUser()
         report(.resume)
         state = .playing
+        nowPlaying?.notePlayback(isPlaying: true, elapsed: lastTick?.adTime ?? 0)
     }
 
     /// Reports an event the SDK cannot observe for itself — mute, fullscreen and

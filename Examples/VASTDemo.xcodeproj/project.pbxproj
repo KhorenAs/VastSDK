@@ -26,6 +26,12 @@
 		CC000000000000000000006A /* ContentPlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000068; };
 		CC000000000000000000006B /* ContentPlayerModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0000000000000000000068; };
 		CC000000000000000000006D /* PlayerControls.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC000000000000000000006C; };
+		FF0000000000000000000012 /* DemoNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0000000000000000000011; };
+		FF0000000000000000000013 /* DemoNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0000000000000000000011; };
+		FF0000000000000000000014 /* DemoNowPlaying.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0000000000000000000011; };
+		FF0000000000000000000002 /* DemoSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0000000000000000000001; };
+		FF0000000000000000000003 /* DemoSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0000000000000000000001; };
+		FF0000000000000000000004 /* DemoSettings.swift in Sources */ = {isa = PBXBuildFile; fileRef = FF0000000000000000000001; };
 		DD0000000000000000000002 /* ClickThrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000001; };
 		DD0000000000000000000003 /* ClickThrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000001; };
 		DD0000000000000000000004 /* ClickThrough.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD0000000000000000000001; };
@@ -50,6 +56,8 @@
 		CC0000000000000000000068 /* ContentPlayerModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentPlayerModel.swift; sourceTree = "<group>"; };
 		CC000000000000000000006C /* PlayerControls.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerControls.swift; sourceTree = "<group>"; };
 		DD0000000000000000000001 /* ClickThrough.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClickThrough.swift; sourceTree = "<group>"; };
+		FF0000000000000000000001 /* DemoSettings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoSettings.swift; sourceTree = "<group>"; };
+		FF0000000000000000000011 /* DemoNowPlaying.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DemoNowPlaying.swift; sourceTree = "<group>"; };
 		EE0000000000000000000001 /* AdBreakScreen.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdBreakScreen.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -81,6 +89,8 @@
 		AA000000000000000000000F /* Shared */ = {isa = PBXGroup; children = (
 				EE0000000000000000000001,
 				DD0000000000000000000001,
+				FF0000000000000000000001,
+				FF0000000000000000000011,
 				CC0000000000000000000064,
 				CC0000000000000000000068,
 				BB0000000000000000000001,
@@ -190,6 +200,8 @@
 
 /* Begin PBXSourcesBuildPhase section */
 		AA0000000000000000000015 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				FF0000000000000000000012,
+				FF0000000000000000000002,
 				EE0000000000000000000002,
 				DD0000000000000000000002,
 				CC0000000000000000000065,
@@ -200,6 +212,8 @@
 				AA000000000000000000001E,
 			); runOnlyForDeploymentPostprocessing = 0; };
 		AA0000000000000000000022 = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				FF0000000000000000000013,
+				FF0000000000000000000003,
 				EE0000000000000000000003,
 				DD0000000000000000000003,
 				CC0000000000000000000066,
@@ -210,6 +224,8 @@
 				AA000000000000000000002B,
 			); runOnlyForDeploymentPostprocessing = 0; };
 		AA000000000000000000002F = {isa = PBXSourcesBuildPhase; buildActionMask = 2147483647; files = (
+				FF0000000000000000000014,
+				FF0000000000000000000004,
 				EE0000000000000000000004,
 				DD0000000000000000000004,
 				CC0000000000000000000067,
@@ -264,6 +280,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.swiftuidemo";
@@ -283,6 +300,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.swiftuidemo";
@@ -302,6 +320,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.uikitdemo";
@@ -321,6 +340,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_KEY_UIBackgroundModes = audio;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = "com.kinodaran.vastsdk.uikitdemo";

@@ -12,3 +12,6 @@
 
 /* The skip control before it unlocks: seconds remaining. */
 "skip.countdown" = "Skip in %lld";
+
+/* The lock screen's name for an ad, when the response carried no <AdTitle>. */
+"nowplaying.title" = "Advertisement";

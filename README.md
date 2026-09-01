@@ -63,6 +63,82 @@ transparent layer takes no focus. The session says so through the delegate
 instead of drawing something inert; a tvOS host uses `.host` with a focusable
 control of its own, or `.disabled`.
 
+### Picture in Picture
+
+Picture in Picture is bound to the `AVPlayerLayer`, not to the item on it, so a
+host that supports it at all shows the creative in the window without anyone
+deciding to — and the surface, being views in the app, stays behind. Whatever a
+player wants to happen there, it has to say so: `VASTSurfacePresence` cannot see
+this one, because the surface is still present and still full size, just no
+longer where the ad is.
+
+Hand the session the controller and it applies a policy for the length of a
+break, and only for that long:
+
+```swift
+let pip = AVPictureInPictureController(playerLayer: playerLayer)
+session.registerPictureInPicture(pip)
+```
+
+- `.allowed` — the default — plays the ad in the window, like the content it
+  interrupted. A viewer who opened the window asked for it, and what it costs is
+  smaller than it first looks: tapping the window comes back to the app, where the
+  surface is where it always was. The skip control is a tap further away rather
+  than gone, and `skipControlUnavailableFor` says so at the one moment it matters
+  — the offset elapsing with the viewer still out there.
+- `.pausesAd` keeps the window and holds the ad while it is open, reported as a
+  §3.14.1 `pause`. Nothing plays unwatched.
+- `.suspended` closes the window for the break and switches off automatic entry
+  while it runs: the ad plays where its controls are or it does not play.
+
+The session takes the controller's delegate seat and forwards every callback to
+whichever delegate was already there, so registering costs the host nothing; call
+`unregisterPictureInPicture()` if the player outlives the session.
+
+AVKit cannot refuse a start — `canStartPictureInPictureAutomaticallyFromInline`
+covers automatic entry only, and the delegate's `willStart` cannot cancel — so
+under `.suspended` a control left enabled opens the window and has it closed
+again a moment later: right, and visibly clumsy. Bind your own control to
+`session.permitsPictureInPicture` and it disappears for the length of the break
+instead. Under the other two policies it stays true, because there the window is
+the viewer's.
+
+The window draws its own controls and AVKit exposes exactly one switch over them:
+`requiresLinearPlayback`, which the break sets, and which disables fast forward,
+forward skip and scrubbing. Play and pause are not on that list and cannot be
+removed, so under `.allowed` and `.pausesAd` the viewer can pause an ad from the
+window. That is reported rather than fought — `pause` and `resume` go out, and
+`state` follows. A host that needs an unpausable ad wants `.suspended`.
+
+None of it runs without the `audio` background mode and an active `.playback`
+audio session — the window does not open at all otherwise.
+
+### The system transport
+
+Those same two settings make the app the Now Playing app, so Control Centre, the
+lock screen, AirPods and CarPlay start offering a transport for whatever is on
+the player. During a break that is the creative, and their seek controls are the
+window's scrubber again — in a place the host cannot see it being offered.
+
+There is nothing to register: `MPRemoteCommandCenter` and `MPNowPlayingInfoCenter`
+are process-wide singletons. The break borrows them and gives them back, the way
+it already borrows the host's player item.
+
+- `.describesAd` — the default — disables the commands that would seek, skip or
+  change rate, and publishes the ad's `<AdTitle>` and `<Advertiser>` while it
+  plays. Both are restored when the break ends, `isEnabled` value by `isEnabled`
+  value: a command the host had switched off comes back switched off.
+- `.locksControls` does the first half and leaves the host's Now Playing
+  information alone.
+- `.untouched` does neither.
+
+Play and pause are deliberately left enabled. They reach the `AVPlayer` like any
+other pause, and the session reports them as §3.14.1 `pause` and `resume`.
+
+`changePlaybackRateCommand` is locked with the seek controls, for a less obvious
+reason: watched time is measured from the playhead, so a creative played at 2× is
+watched in half the time and every quartile still fires.
+
 ## What it covers
 
 | | |
@@ -180,12 +256,21 @@ Each of these is a bug that was found and is now pinned by a test.
 - **`URL(string:)` percent-encodes brackets**, so `[ERRORCODE]` arrives as
   `%5BERRORCODE%5D`; and a leftover vendor macro makes Foundation re-encode the
   whole string, double-encoding values that were already correct.
+- **Picture in Picture follows the layer, not the item.** Replacing the item swaps
+  the creative into a window that is already open, so the ad appears there on its
+  own — with the skip control and the click layer left behind in the app, and the
+  surface probe reporting a surface that is present, full size and no longer where
+  the ad is.
 - **iOS never resumes playback after backgrounding.** `rate` is left at 0, and a
   stall watchdog that keys on `rate > 0` cannot tell that apart from a hang.
 - **Recovering from that made pausing impossible.** Re-issuing playback every tick
-  is indistinguishable, from the player alone, from a host deliberately pausing —
-  so a pause was undone within one tick and reported to nobody. It has to be
-  stated, which is why `pause()` exists rather than watching `rate`.
+  is indistinguishable, from `rate` alone, from a host deliberately pausing — so a
+  pause was undone within one tick and reported to nobody. `timeControlStatus` is
+  what separates them: `.waitingToPlayAtSpecifiedRate` is the buffer and `.paused`
+  is somebody's decision, where a rate of zero is both. The SDK watches the status,
+  so a pause made on the player — the Picture in Picture window's own button
+  included — is honoured and reported as §3.14.1 `pause`. `pause()` is still the
+  path a host should take; it is no longer the only one that works.
 - **A host-supplied control cannot be handed back as-is.** `makeUIView` runs once
   per view identity, so returning the builder's view froze whatever the first call
   produced: a countdown that never counted, a skip control stuck on the hourglass
@@ -207,7 +292,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 229 tests
+swift test                  # 261 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 
@@ -220,6 +305,12 @@ The demo's scenario list covers two live tags from Google's public IMA sample
 inventory, skippable and non-skippable responses, a three-ad pod, a no-fill
 response and an unplayable creative. The list footer shows live player-screen
 count; it must read zero once no player screen is open.
+
+The iOS demos pick a Picture in Picture policy above the list — it is part of a
+session's configuration, so it applies to the next player screen rather than to
+the one already open — and each player screen has a `PiP` button. Backgrounding
+the app mid-ad is the other way in, and the one worth watching. Both need a
+device: the Simulator does not do Picture in Picture.
 
 ## Requirements
 

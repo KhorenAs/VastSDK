@@ -104,6 +104,18 @@ Everything above is closed except item 7. What has come up since, unclosed:
 - **tvOS cannot offer a surface click**, by construction: a transparent layer
   takes no focus. The SDK reports it and the demos opt out knowingly; a real tvOS
   host needs `clickPresentation = .host` and a focusable control of its own.
+- **The Picture in Picture policy has not been run on a device.** The decision it
+  turns on is covered by tests; the coordinator that carries it out cannot be, since
+  `AVPictureInPictureController` does not exist in a test process. The two iOS demos
+  now offer the window, so this is a matter of running them —
+  `requiresLinearPlayback`, the delegate forwarding, and whether iOS keeps the
+  window open across `replaceCurrentItem`, and whether a pause from the window's
+  own button arrives as the `timeControlStatus` change the session now reports on,
+  are all still reasoned rather than observed. The same goes for the Now Playing
+  transport that came with it: the borrowing and giving back is covered by tests,
+  because `MPRemoteCommandCenter` is real in a test process, but whether the lock
+  screen actually loses its scrubber for the break has only been reasoned. The
+  Simulator will answer neither: Picture in Picture needs a device.
 - **The tvOS player is not 16:9.** The aspect ratio yields rather than fighting
   the column, because 16:9 wants 1012pt of a 1080pt screen and the rest of the
   screen cannot spare it. It degrades instead of breaking, which is not the same

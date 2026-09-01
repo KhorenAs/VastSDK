@@ -12,3 +12,6 @@
 
 /* The skip control before it unlocks: seconds remaining. */
 "skip.countdown" = "Բաց թողնել %lld";
+
+/* The lock screen's name for an ad, when the response carried no <AdTitle>. */
+"nowplaying.title" = "Գովազդ";

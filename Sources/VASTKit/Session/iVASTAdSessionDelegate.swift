@@ -44,6 +44,14 @@ public protocol iVASTAdSessionDelegate: AnyObject {
     /// The ad declares a ClickThrough that no viewer can reach — today, a tvOS
     /// host left on `.surface`, where a transparent layer takes no focus.
     func session(_ session: VASTAdSession, clickThroughUnavailableFor ad: VASTAd, reason: String)
+
+    /// The player entered or left the Picture in Picture window.
+    ///
+    /// Reported for the whole session, not only during a break: a host that hides
+    /// its own controls for the window needs to know either way. What the ad does
+    /// about it is `Configuration.pictureInPicture`, and under `.allowed` the two
+    /// `…Unavailable` callbacks above say what it cost.
+    func session(_ session: VASTAdSession, pictureInPictureDidChange isActive: Bool)
 }
 
 public extension iVASTAdSessionDelegate {
@@ -60,4 +68,5 @@ public extension iVASTAdSessionDelegate {
     func sessionDidFinishAllAds(_ session: VASTAdSession) {}
     func session(_ session: VASTAdSession, skipControlUnavailableFor ad: VASTAd, reason: String) {}
     func session(_ session: VASTAdSession, clickThroughUnavailableFor ad: VASTAd, reason: String) {}
+    func session(_ session: VASTAdSession, pictureInPictureDidChange isActive: Bool) {}
 }

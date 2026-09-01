@@ -59,6 +59,9 @@ final class AdBreakViewController: UIViewController {
 
     // Actions and log
     private let breakButton = UIButton(type: .system)
+    /// Opens the window by hand. The other way in — leaving the app mid-ad —
+    /// needs no button, and is the case the policy exists for.
+    private let pictureInPictureButton = UIButton(type: .system)
     private let stateLabel = UILabel()
     private let logView = UITextView()
 
@@ -137,6 +140,9 @@ final class AdBreakViewController: UIViewController {
 
         playerView.attach(player: screen.player, gravity: .resizeAspect)
         playerView.translatesAutoresizingMaskIntoConstraints = false
+        // The layer is what Picture in Picture is built from, and this view is
+        // the only thing that has one.
+        screen.adoptPlayerLayer(playerView.playerLayer)
         // The SDK owns the behaviour §2.3 and §3.10.1 require; the look is ours.
         let surface = screen.session.attach(to: playerView)
         surface.skipButtonBuilder = { remaining in
@@ -158,11 +164,17 @@ final class AdBreakViewController: UIViewController {
         divider.backgroundColor = .separator
 
         breakButton.addTarget(self, action: #selector(breakTapped), for: .primaryActionTriggered)
+        pictureInPictureButton.addTarget(
+            self, action: #selector(pictureInPictureTapped), for: .primaryActionTriggered
+        )
         stateLabel.font = .preferredFont(forTextStyle: .caption1)
         stateLabel.textColor = .secondaryLabel
         let spacer = UIView()
-        let actions = UIStackView(arrangedSubviews: [breakButton, spacer, stateLabel])
+        let actions = UIStackView(
+            arrangedSubviews: [breakButton, pictureInPictureButton, spacer, stateLabel]
+        )
         actions.alignment = .center
+        actions.spacing = 16
 
         #if os(iOS)
         logView.isEditable = false
@@ -317,6 +329,7 @@ final class AdBreakViewController: UIViewController {
         }
 
         renderBreakButton()
+        renderPictureInPictureButton()
         stateLabel.text = stateDescription
 
         let text = screen.log.joined(separator: "\n")
@@ -332,6 +345,21 @@ final class AdBreakViewController: UIViewController {
             hostSkip.secondsUntilUnlock = nil
             hostSkip.isHidden = !(isPlayingAd && screen.session.canSkip)
         }
+    }
+
+    /// Hidden where the window cannot exist at all, disabled where it exists but
+    /// cannot open yet — the layer has to be on screen with something playable in
+    /// it before `startPictureInPicture` does anything.
+    private func renderPictureInPictureButton() {
+        // Hidden outright while the session says the window is not on offer:
+        // under `.suspended` a press opens it and has it shut again a moment
+        // later — the right outcome, reached the ugly way.
+        pictureInPictureButton.isHidden =
+            screen.pictureInPicture == nil || !screen.session.permitsPictureInPicture
+        pictureInPictureButton.isEnabled = screen.isPictureInPicturePossible
+        pictureInPictureButton.setTitle(
+            screen.isInPictureInPicture ? "Leave PiP" : "PiP", for: .normal
+        )
     }
 
     /// One button, four meanings — a label reading "Replay" before anything has
@@ -381,6 +409,8 @@ final class AdBreakViewController: UIViewController {
         }
     }
 
+    @objc private func pictureInPictureTapped() { screen.togglePictureInPicture() }
+
     @objc private func skipTapped() {
         do { try screen.session.skip() } catch { screen.note("skip refused · \(error)") }
     }
@@ -427,6 +457,12 @@ extension AdBreakViewController: iVASTAdSessionDelegate {
 
     func session(_ session: VASTAdSession, skipControlUnavailableFor ad: VASTAd, reason: String) {
         screen.note("⚠︎ skip control unavailable · \(reason)")
+    }
+
+    /// Reported on tvOS for a `.surface` click, and on every platform once an ad
+    /// is playing in a window the click layer is not over.
+    func session(_ session: VASTAdSession, clickThroughUnavailableFor ad: VASTAd, reason: String) {
+        screen.note("⚠︎ click path unavailable · \(reason)")
     }
 }
 

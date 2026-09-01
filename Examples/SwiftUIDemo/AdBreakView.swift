@@ -11,6 +11,7 @@ import VASTKit
 struct ScenarioListView: View {
 
     @ObservedObject private var liveCount = AdBreakScreen.LiveCount.shared
+    @ObservedObject private var settings = DemoSettings.shared
 
     var body: some View {
         NavigationStack {
@@ -29,7 +30,33 @@ struct ScenarioListView: View {
             .navigationDestination(for: DemoScenario.self) { scenario in
                 PlayerView(scenario: scenario)
             }
-            .safeAreaInset(edge: .bottom) { liveScreenCount }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 4) {
+                    pictureInPicturePolicy
+                    liveScreenCount
+                }
+                .padding(.top, 6)
+                // `.bar` does not exist on tvOS, and this inset sits over a
+                // scrolling list on every platform, so it needs *some* ground.
+                .background(.regularMaterial)
+            }
+        }
+    }
+
+    /// Chosen here rather than on the player screen, because it is part of the
+    /// session's configuration and the session is built when that screen opens.
+    private var pictureInPicturePolicy: some View {
+        VStack(spacing: 2) {
+            Picker("Picture in Picture", selection: $settings.pictureInPictureIndex) {
+                ForEach(DemoSettings.pictureInPictureLabels.indices, id: \.self) { index in
+                    Text(DemoSettings.pictureInPictureLabels[index]).tag(index)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
+            Text("picture in picture during an ad · applies to the next screen")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
         }
     }
 
@@ -62,8 +89,10 @@ struct PlayerView: View {
             header
 
             ZStack {
-                PlayerLayerView(player: screen.player)
-                    .aspectRatio(16 / 9, contentMode: .fit)
+                PlayerLayerView(player: screen.player) { layer in
+                    screen.adoptPlayerLayer(layer)
+                }
+                .aspectRatio(16 / 9, contentMode: .fit)
                 VASTAdSurface(session: screen.session)
                     .vastSkipButton { remaining in
                         DemoSkipButton(secondsUntilUnlock: remaining)
@@ -154,11 +183,28 @@ struct PlayerView: View {
     private var actions: some View {
         HStack {
             breakButton
+            pictureInPictureButton
             Spacer()
             Text(stateLabel).font(.caption).foregroundStyle(.secondary)
         }
         .padding(.horizontal)
         .padding(.vertical, 8)
+    }
+
+    /// Opens the window by hand. The other way in — leaving the app while an ad
+    /// plays — needs no button at all, which is the case the policy exists for.
+    ///
+    /// Gone entirely while the session says the window is not on offer: under
+    /// `.suspended` a press would open it and have it shut again, which is the
+    /// right outcome reached the ugly way.
+    @ViewBuilder
+    private var pictureInPictureButton: some View {
+        if screen.pictureInPicture != nil, screen.session.permitsPictureInPicture {
+            Button(screen.isInPictureInPicture ? "Leave PiP" : "PiP") {
+                screen.togglePictureInPicture()
+            }
+            .disabled(!screen.isPictureInPicturePossible)
+        }
     }
 
     /// One button, four meanings — because a label that stays "Replay" while
