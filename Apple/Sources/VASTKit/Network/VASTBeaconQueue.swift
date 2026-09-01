@@ -46,9 +46,10 @@ actor VASTBeaconQueue {
     private let log = Logger(subsystem: "com.kinodaran.vastsdk", category: "delivery")
 
     init(fileName: String = "vast-pending-beacons.json") {
-        // Caches rather than Application Support: these are re-sendable records,
-        // not user data, and the system reclaiming them costs a count rather than
-        // anything the viewer would miss.
+        // Caches rather than Application Support, for two reasons: the system
+        // reclaiming these costs a count rather than anything the viewer would
+        // miss, and Caches is excluded from device backups — so a queued
+        // identifier does not travel to iCloud or to a desktop archive.
         fileURL = FileManager.default
             .urls(for: .cachesDirectory, in: .userDomainMask).first?
             .appendingPathComponent(fileName)
@@ -102,9 +103,23 @@ actor VASTBeaconQueue {
     private func save(_ entries: [Entry]) {
         guard let fileURL else { return }
         guard let data = try? JSONEncoder().encode(entries) else { return }
+        // Encrypted at rest, because of what these URLs contain. Macros are
+        // expanded before a beacon reaches a transport, so a queued URL carries
+        // whatever the host supplied — an advertising identifier and a TCF consent
+        // string among them. Holding that in plaintext for hours is not what
+        // keeping a beacon was meant to cost.
+        //
+        // `.completeFileProtection` rather than `.completeUnlessOpen`: a flush
+        // only happens while an ad is playing, so the file never needs reading
+        // while the device is locked.
+        //
         // A failed write is not worth interrupting anything for: the beacons are
         // still in memory, and this run will still try to send them.
-        try? data.write(to: fileURL, options: .atomic)
+        do {
+            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+        } catch {
+            log.notice("could not hold beacons for retry: \(error.localizedDescription, privacy: .public)")
+        }
     }
 
     private func trimmed(_ entries: [Entry]) -> [Entry] {
