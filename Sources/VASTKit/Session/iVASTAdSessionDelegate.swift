@@ -45,6 +45,20 @@ public protocol iVASTAdSessionDelegate: AnyObject {
     /// host left on `.surface`, where a transparent layer takes no focus.
     func session(_ session: VASTAdSession, clickThroughUnavailableFor ad: VASTAd, reason: String)
 
+    /// The session reported something to the ad server.
+    ///
+    /// Called once per distinct kind, in the order the beacons went out, and
+    /// whether or not the network accepted them — what is being reported is the
+    /// event, not the delivery. A response carrying three `<Impression>` URLs is
+    /// three beacons and one impression, so this fires once for it.
+    ///
+    /// It exists because tracking is the one thing a host cannot observe for
+    /// itself: the beacons live inside the response and go out from here, so
+    /// without this a host embedding the SDK has no way to know an ad reached
+    /// its midpoint. Reporting is still the session's job — this is a mirror,
+    /// not a hook, and nothing is asked of the delegate.
+    func session(_ session: VASTAdSession, didReport event: VASTBeacon.Kind, for ad: VASTAd?)
+
     /// The player entered or left the Picture in Picture window.
     ///
     /// Reported for the whole session, not only during a break: a host that hides
@@ -68,5 +82,6 @@ public extension iVASTAdSessionDelegate {
     func sessionDidFinishAllAds(_ session: VASTAdSession) {}
     func session(_ session: VASTAdSession, skipControlUnavailableFor ad: VASTAd, reason: String) {}
     func session(_ session: VASTAdSession, clickThroughUnavailableFor ad: VASTAd, reason: String) {}
+    func session(_ session: VASTAdSession, didReport event: VASTBeacon.Kind, for ad: VASTAd?) {}
     func session(_ session: VASTAdSession, pictureInPictureDidChange isActive: Bool) {}
 }

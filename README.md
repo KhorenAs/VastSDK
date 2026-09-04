@@ -16,7 +16,7 @@ Sources/
   VASTKit/    player + UI binding
   Harness/    runnable logic harness: `swift run Harness`
 Examples/     VASTDemo.xcodeproj — SwiftUIDemo · UIKitDemo · AppKitDemo
-Tests/        229 tests
+Tests/        266 tests
 ```
 
 Android and Web get their own repositories rather than empty folders here. The
@@ -62,6 +62,26 @@ On tvOS there is no pointer, so `clickPresentation = .surface` cannot work — a
 transparent layer takes no focus. The session says so through the delegate
 instead of drawing something inert; a tvOS host uses `.host` with a focusable
 control of its own, or `.disabled`.
+
+### Knowing what was reported
+
+Tracking is the one thing a host cannot observe for itself: the beacons live
+inside the response and go out from the session, so an embedder has no way to
+know an ad reached its midpoint. The delegate says so.
+
+```swift
+func session(_ session: VASTAdSession, didReport event: VASTBeacon.Kind, for ad: VASTAd?)
+```
+
+Called once per distinct kind, in the order the beacons went out, and whether or
+not the network accepted them — what is reported is the event, not the delivery.
+A response carrying three `<Impression>` URLs is three beacons and one
+impression, so it fires once for that.
+
+It is driven from the same funnel as measurement, for the same reason: a second
+set of call sites would drift from the beacons, and then a host's own analytics
+would disagree with the ad server's. Reporting stays the session's job — this is
+a mirror, not a hook, and nothing is asked of the delegate.
 
 ### Picture in Picture
 
@@ -292,7 +312,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 261 tests
+swift test                  # 266 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 

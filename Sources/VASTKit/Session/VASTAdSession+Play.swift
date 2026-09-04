@@ -308,6 +308,7 @@ extension VASTAdSession {
     func send(_ beacons: [VASTBeacon]) {
         guard !beacons.isEmpty else { return }
         notifyMeasurement(of: beacons)
+        notifyDelegate(of: beacons)
         let expanded = beacons.map(expandMacros)
         let transport = transport
         Task.detached { await transport.fire(expanded) }
@@ -327,6 +328,21 @@ extension VASTAdSession {
             if event == last { continue }
             last = event
             measurement.record(event)
+        }
+    }
+
+    /// The delegate hears the same sequence, in the same order, and for the
+    /// same reason measurement does: a second set of call sites would drift
+    /// from the beacons, and then a host's own analytics would disagree with
+    /// the ad server's.
+    private func notifyDelegate(of beacons: [VASTBeacon]) {
+        guard let delegate else { return }
+        var last: VASTBeacon.Kind?
+        for beacon in beacons {
+            // Three `<Impression>` URLs are three beacons and one impression.
+            if beacon.kind == last { continue }
+            last = beacon.kind
+            delegate.session(self, didReport: beacon.kind, for: currentAd)
         }
     }
 

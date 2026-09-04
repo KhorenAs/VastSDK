@@ -13,5 +13,5 @@ import Foundation
 /// `[CLIENTUA]`, which is how an exchange tells one player from another when a
 /// creative misbehaves.
 public enum VASTVersion {
-    public static let current = "1.2.0"
+    public static let current = "1.5.0"
 }
