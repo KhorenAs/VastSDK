@@ -113,10 +113,21 @@ actor VASTBeaconQueue {
         // only happens while an ad is playing, so the file never needs reading
         // while the device is locked.
         //
+        // Not on macOS, where the option is not merely unnecessary but fatal:
+        // data protection classes are an iOS mechanism, and `write` refuses the
+        // whole write rather than ignoring an option it cannot honour — which
+        // meant the queue never survived a relaunch there at all. Whole-disk
+        // encryption is the Mac's answer and is not ours to ask for.
+        //
         // A failed write is not worth interrupting anything for: the beacons are
         // still in memory, and this run will still try to send them.
+        #if os(macOS)
+        let options: Data.WritingOptions = [.atomic]
+        #else
+        let options: Data.WritingOptions = [.atomic, .completeFileProtection]
+        #endif
         do {
-            try data.write(to: fileURL, options: [.atomic, .completeFileProtection])
+            try data.write(to: fileURL, options: options)
         } catch {
             log.notice("could not hold beacons for retry: \(error.localizedDescription, privacy: .public)")
         }
