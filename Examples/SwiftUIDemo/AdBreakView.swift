@@ -106,13 +106,16 @@ struct PlayerView: View {
 
             // The content transport disappears for the duration of the break:
             // seeking inside a linear creative is not a thing VAST supports.
-            if screen.isPlayingAd {
+            // The session answers, rather than each demo keeping its own copy of
+            // the rule — a host using AVKit hands over its player view controller
+            // and does not even ask.
+            if screen.session.permitsPlaybackControls {
+                ContentControls(model: screen.content)
+            } else {
                 Text("Content controls are unavailable during an ad")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(height: 62)
-            } else {
-                ContentControls(model: screen.content)
             }
 
             Divider()

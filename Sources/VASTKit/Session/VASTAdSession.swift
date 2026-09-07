@@ -84,6 +84,32 @@ public final class VASTAdSession: ObservableObject {
         }
     }
 
+    /// Whether the host's own transport controls should be offered right now.
+    ///
+    /// `false` for the length of a break, because an ad the viewer can scrub is
+    /// an ad the viewer can get past: VAST defines no attribute that would
+    /// permit seeking inside a linear creative, and the tracking engine treats a
+    /// forward jump as unwatched time rather than as progress.
+    ///
+    /// For a host drawing its own controls. A host using AVKit should call
+    /// `registerPlaybackControls` instead and have the SDK do it — the switch
+    /// that disables scrubbing belongs to a view controller the session never
+    /// sees. Both are the same answer; only one of them needs remembering.
+    ///
+    /// Unconditional, unlike `permitsPictureInPicture`, because there is no
+    /// policy here to be chosen: drawing the control is the host's decision and
+    /// this is only the SDK's answer to it.
+    ///
+    /// `.loading` counts, and takes the controls a moment before the creative is
+    /// the item in the player. That is the safe direction of being early, and it
+    /// is the same shape `permitsPictureInPicture` has.
+    public var permitsPlaybackControls: Bool {
+        switch state {
+        case .loading, .playing, .paused: false
+        case .idle, .finished: true
+        }
+    }
+
     /// Whether the ad on screen right now must be drawn by the host: the host
     /// allowed it *and* this response asked for it.
     public var suppressesAdUI: Bool {
@@ -138,6 +164,11 @@ public final class VASTAdSession: ObservableObject {
     /// Held for the life of the session rather than the break: the window can be
     /// opened before a break starts, and the policy has to be there when it is.
     var pictureInPicture: VASTPictureInPictureCoordinator?
+    /// The host's transport controls, once they have been registered. Held for
+    /// the life of the session for the same reason as the Picture in Picture
+    /// controller: it is the host's object, registered once, and the break is
+    /// only when it is borrowed.
+    var playbackControls: VASTPlaybackControlsCoordinator?
     /// Bumped by `stop()`. Work that was already in flight compares the token it
     /// started with and discards its result if the session has moved on.
     ///

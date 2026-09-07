@@ -83,6 +83,51 @@ set of call sites would drift from the beacons, and then a host's own analytics
 would disagree with the ad server's. Reporting stays the session's job — this is
 a mirror, not a hook, and nothing is asked of the delegate.
 
+### The player's own controls
+
+An ad the viewer can scrub is an ad the viewer can get past. Nothing is
+mis-measured when they do — a forward seek never extends the tracking engine's
+coverage of the creative, and reaching the end that way is not completion — but
+the viewer still leaves the ad behind, and the advertiser still paid for the
+impression they were shown. VAST defines no attribute that would permit seeking
+inside a linear creative. The only reason it is possible is that the controls
+belong to the host.
+
+Hand them over and the break borrows them:
+
+```swift
+session.registerPlaybackControls(playerViewController)  // AVPlayerView on macOS
+```
+
+- On iOS and tvOS it sets `requiresLinearPlayback`, which removes scrubbing, fast
+  forward and forward skip, and empties `speeds`. Play and pause are not on that
+  list and stay — a paused ad is reported as a §3.14.1 `pause` rather than fought
+  — while the speed menu goes for the same reason `NowPlayingPolicy.describesAd`
+  locks `changePlaybackRateCommand`: watched time is measured from the playhead,
+  so a creative played at 2× is watched in half the time and every quartile still
+  fires.
+- On macOS it sets `controlsStyle` to `.none`. `AVPlayerView` has no
+  `requiresLinearPlayback`, no delegate method that can refuse a seek, and no
+  documentation of what the `.minimal` pane contains, so the pane that certainly
+  carries no timeline is the only honest answer. It costs the viewer play and
+  pause for the length of the break, which is the one place this is blunter than
+  it wants to be.
+
+Every value is saved before it is changed and restored from what was saved, not
+from a default: a host that already required linear playback for its own content
+— a live stream, a player that never allowed scrubbing — does not get scrubbing
+handed to it as a parting gift. Call `unregisterPlaybackControls()` if the player
+outlives the session.
+
+There is no policy to choose here, unlike the window and the system transport.
+Registering *is* the opt-in. A host drawing its own controls — a custom bar, or a
+SwiftUI overlay — never registers anything and binds to `permitsPlaybackControls`
+instead, which is the same answer in the shape a view can read. The SDK cannot do
+that half itself: the switch lives on a view controller an ad session never sees,
+and Apple's own header says so — "This method should not be used to disable
+scrubbing; use the `requiresLinearPlayback` property of the AVPlayerViewController
+instead."
+
 ### Picture in Picture
 
 Picture in Picture is bound to the `AVPlayerLayer`, not to the item on it, so a
@@ -178,6 +223,7 @@ watched in half the time and every quartile still fires.
 | `<ViewableImpression>` | ✅ parsed — and `<ViewUndetermined>` is what this player can honestly send |
 | `<Icon>` (AdChoices) | ✅ parsed into `ad.icons` — ❌ not drawn; see below |
 | Undelivered beacons kept and retried, across launches | ✅ |
+| The host's own transport controls held linear for the break, and given back | ✅ |
 | Skip control and countdown localised (`en`, `hy`) | ✅ |
 | Executing verification code (OM SDK) | ❌ by decision — `iVASTAdMeasurement` is the seam |
 | NonLinear · Companion · VPAID · SIMID | ❌ by decision |

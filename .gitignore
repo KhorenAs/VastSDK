@@ -11,6 +11,8 @@ Packages/
 xcuserdata/
 *.xcuserstate
 DerivedData/
+# `xcodebuild -project` without a derived data path writes here.
+build/
 *.moved-aside
 *.hmap
 *.ipa

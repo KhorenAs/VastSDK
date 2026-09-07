@@ -59,6 +59,10 @@ extension VASTAdSession {
         // already appeared there.
         pictureInPicture?.adBreakDidBegin()
 
+        // And the host's own controls, for the same reason and one step closer:
+        // the scrubber in the app is the one the viewer reaches first.
+        playbackControls?.adBreakDidBegin()
+
         // Likewise the system transport: the seek controls have to be gone
         // before a creative is what they would be seeking.
         let nowPlaying = VASTNowPlayingController(policy: configuration.nowPlaying)
@@ -74,6 +78,7 @@ extension VASTAdSession {
             playback.invalidate()
             if activePlayback === playback { activePlayback = nil }
             pictureInPicture?.adBreakDidEnd()
+            playbackControls?.adBreakDidEnd()
             nowPlaying.adBreakDidEnd()
             if self.nowPlaying === nowPlaying { self.nowPlaying = nil }
             self.scheduler = nil

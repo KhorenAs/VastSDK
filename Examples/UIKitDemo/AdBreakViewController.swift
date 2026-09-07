@@ -308,7 +308,10 @@ final class AdBreakViewController: UIViewController {
 
     private func render() {
         let isPlayingAd = screen.isPlayingAd
-        transport.isHidden = isPlayingAd
+        // Asked of the session rather than derived from `isPlayingAd`: it also
+        // covers the moment a response is still resolving, and it is the same
+        // answer `registerPlaybackControls` applies for an AVKit host.
+        transport.isHidden = !screen.session.permitsPlaybackControls
         adNotice.isHidden = !isPlayingAd
 
         #if os(tvOS)
