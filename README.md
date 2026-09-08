@@ -406,7 +406,13 @@ device: the Simulator does not do Picture in Picture.
 
 ## Requirements
 
-iOS 16 · tvOS 16 · macOS 13 · Swift 6 (strict concurrency)
+iOS 15.6 · tvOS 15.6 · macOS 13 · Swift 6 (strict concurrency)
+
+The floor came down from 16 for a host that had shipped to 15.6 and could not
+raise it. One feature is version-gated by it: `registerPlaybackControls` locks
+the AVKit speed menu, and `speeds` arrived in iOS 16 and tvOS 16 — below that
+there is no menu to lock, so nothing is missing rather than something being
+skipped.
 
 Test fixtures under `Tests/VASTCoreTests/Fixtures/` come from the IAB sample tags
 shipped with [dailymotion/vast-client-js](https://github.com/dailymotion/vast-client-js)

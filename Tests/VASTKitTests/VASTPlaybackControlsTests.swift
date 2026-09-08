@@ -65,10 +65,16 @@ final class VASTPlaybackControlsCoordinatorTests: XCTestCase {
         controls.requiresLinearPlayback = false
         coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         XCTAssertTrue(controls.requiresLinearPlayback, "the creative can be scrubbed past")
-        XCTAssertTrue(controls.speeds.isEmpty, "a 2x ad is watched in half the time")
+        // Guarded because the test target compiles for iOS and tvOS too, where
+        // the package floor is now below the version this property arrived in.
+        if #available(iOS 16.0, tvOS 16.0, *) {
+            XCTAssertTrue(controls.speeds.isEmpty, "a 2x ad is watched in half the time")
+        }
         coordinator.adBreakDidEnd()
         XCTAssertFalse(controls.requiresLinearPlayback)
-        XCTAssertFalse(controls.speeds.isEmpty, "the host's speed menu is gone for good")
+        if #available(iOS 16.0, tvOS 16.0, *) {
+            XCTAssertFalse(controls.speeds.isEmpty, "the host's speed menu is gone for good")
+        }
         #endif
     }
 

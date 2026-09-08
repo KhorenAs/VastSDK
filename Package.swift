@@ -13,8 +13,8 @@ let package = Package(
     name: "VASTSDK",
     defaultLocalization: "en",
     platforms: [
-        .iOS(.v16),
-        .tvOS(.v16),
+        .iOS("15.6"),
+        .tvOS("15.6"),
         .macOS(.v13),
     ],
     products: [

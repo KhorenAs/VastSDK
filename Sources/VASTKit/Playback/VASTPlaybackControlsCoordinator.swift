@@ -43,7 +43,9 @@ public extension VASTAdSession {
     /// - `speeds`, emptied for the length of the break. Watched time is measured
     ///   from the playhead, so a creative played at 2× is watched in half the time
     ///   and every quartile still fires — the same reason
-    ///   `NowPlayingPolicy.describesAd` locks `changePlaybackRateCommand`.
+    ///   `NowPlayingPolicy.describesAd` locks `changePlaybackRateCommand`. iOS 16
+    ///   and tvOS 16 and up: the speed control arrived with the property, so
+    ///   below that there is no menu to lock and nothing is missing.
     /// - `controlsStyle` on macOS, set to `.none`. `AVPlayerView` has no
     ///   `requiresLinearPlayback` and no delegate method that can refuse a seek,
     ///   and what the `.minimal` pane contains is not documented, so the pane
@@ -115,7 +117,11 @@ final class VASTPlaybackControlsCoordinator {
     private var savedControlsStyle: AVPlayerViewControlsStyle?
     #else
     private var savedRequiresLinearPlayback: Bool?
-    private var savedSpeeds: [AVPlaybackSpeed]?
+    /// `Any` rather than `[AVPlaybackSpeed]`: the type does not exist below
+    /// iOS 16, and a stored property cannot be made conditional on a version
+    /// the way a statement can. Only ever the array, and only ever put back
+    /// where it was taken from.
+    private var savedSpeeds: Any?
     #endif
     /// Only ever set under `.suspended`; `nil` under the other policies means
     /// the window was never this coordinator's business.
@@ -143,8 +149,12 @@ final class VASTPlaybackControlsCoordinator {
         guard savedRequiresLinearPlayback == nil else { return }
         savedRequiresLinearPlayback = controls.requiresLinearPlayback
         controls.requiresLinearPlayback = true
-        savedSpeeds = controls.speeds
-        controls.speeds = []
+        // The speed control arrived with `speeds` in iOS 16 and tvOS 16, so
+        // below that there is no menu to lock and nothing missing.
+        if #available(iOS 16.0, tvOS 16.0, *) {
+            savedSpeeds = controls.speeds
+            controls.speeds = []
+        }
         #endif
 
         // The other two policies mean the window is the viewer's, and taking the
@@ -176,7 +186,7 @@ final class VASTPlaybackControlsCoordinator {
             controls.requiresLinearPlayback = saved
             savedRequiresLinearPlayback = nil
         }
-        if let saved = savedSpeeds {
+        if #available(iOS 16.0, tvOS 16.0, *), let saved = savedSpeeds as? [AVPlaybackSpeed] {
             controls.speeds = saved
             savedSpeeds = nil
         }
