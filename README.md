@@ -113,11 +113,27 @@ session.registerPlaybackControls(playerViewController)  // AVPlayerView on macOS
   pause for the length of the break, which is the one place this is blunter than
   it wants to be.
 
+- Under `.suspended` only, it also switches off `allowsPictureInPicturePlayback`.
+  That is the one Picture in Picture lever an AVKit host has: AVKit builds and
+  keeps its own `AVPictureInPictureController`, so `registerPictureInPicture` has
+  nothing to be given, and this switch — `true` by default on iOS and tvOS — is
+  all that is exposed. In one respect it is better than the controller's route,
+  because it refuses a start instead of closing a window a moment after it
+  opened.
+
+  It is also less: neither `AVPlayerViewController` nor `AVPlayerView` will say
+  whether the window is already open, and what revoking the permission does to
+  one that is is undocumented. So for an AVKit host `.suspended` means "no window
+  opens during the break" rather than "no window exists during it", and
+  `.pausesAd` — which has to know when the window opens — cannot be honoured at
+  all. Both need a host that owns its `AVPlayerLayer` and registers a controller.
+
 Every value is saved before it is changed and restored from what was saved, not
 from a default: a host that already required linear playback for its own content
 — a live stream, a player that never allowed scrubbing — does not get scrubbing
-handed to it as a parting gift. Call `unregisterPlaybackControls()` if the player
-outlives the session.
+handed to it as a parting gift, and a host that never allowed the window does not
+find it allowed when the break ends. Call `unregisterPlaybackControls()` if the
+player outlives the session.
 
 There is no policy to choose here, unlike the window and the system transport.
 Registering *is* the opt-in. A host drawing its own controls — a custom bar, or a
@@ -224,6 +240,7 @@ watched in half the time and every quartile still fires.
 | `<Icon>` (AdChoices) | ✅ parsed into `ad.icons` — ❌ not drawn; see below |
 | Undelivered beacons kept and retried, across launches | ✅ |
 | The host's own transport controls held linear for the break, and given back | ✅ |
+| Picture in Picture policy for an AVKit host | ✅ `.suspended` refuses a start — the rest needs your own `AVPlayerLayer` |
 | Skip control and countdown localised (`en`, `hy`) | ✅ |
 | Executing verification code (OM SDK) | ❌ by decision — `iVASTAdMeasurement` is the seam |
 | NonLinear · Companion · VPAID · SIMID | ❌ by decision |

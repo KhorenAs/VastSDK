@@ -50,6 +50,22 @@ public extension VASTAdSession {
     ///   that certainly carries no timeline is the only honest answer. It costs
     ///   the viewer play and pause for the length of the break, which is the one
     ///   place this is blunter than it wants to be.
+    /// - `allowsPictureInPicturePlayback`, under
+    ///   ``VASTAdSession/PictureInPicturePolicy/suspended`` only. It is the one
+    ///   Picture in Picture lever an AVKit host has: AVKit builds and keeps its
+    ///   own `AVPictureInPictureController`, so `registerPictureInPicture`
+    ///   cannot be given anything, and this switch — `true` by default on iOS
+    ///   and tvOS — is all that is exposed. Better than the controller's route
+    ///   in one respect: it refuses a start rather than closing a window a
+    ///   moment after it opened.
+    ///
+    ///   With one limit, because AVKit sets it: neither `AVPlayerViewController`
+    ///   nor `AVPlayerView` will say whether the window is *already* open, and
+    ///   what revoking the permission does to one that is, is not documented. So
+    ///   `.suspended` here means "no window opens during the break", not "no
+    ///   window exists during it". The full policy — including `.pausesAd`,
+    ///   which needs to know when the window opens — is only available to a host
+    ///   that owns its `AVPlayerLayer` and registers a controller.
     ///
     /// Registering is the opt-in, which is why there is no policy to choose: a
     /// host that wants to keep its own controls simply does not register them,
@@ -65,7 +81,9 @@ public extension VASTAdSession {
         // Registered mid-break: the creative is already the item in the player,
         // so the controls have to be taken now rather than at the next break —
         // which for a single pre-roll would be never.
-        if activeBreak != nil { coordinator.adBreakDidBegin() }
+        if activeBreak != nil {
+            coordinator.adBreakDidBegin(pictureInPicture: configuration.pictureInPicture)
+        }
     }
 
     /// Gives the controls back and stops the session touching them.
@@ -99,6 +117,9 @@ final class VASTPlaybackControlsCoordinator {
     private var savedRequiresLinearPlayback: Bool?
     private var savedSpeeds: [AVPlaybackSpeed]?
     #endif
+    /// Only ever set under `.suspended`; `nil` under the other policies means
+    /// the window was never this coordinator's business.
+    private var savedAllowsPictureInPicture: Bool?
 
     init(controls: PlatformPlayerControls) {
         self.controls = controls
@@ -109,7 +130,10 @@ final class VASTPlaybackControlsCoordinator {
     /// Saves the host's settings and applies the break's. A second call while
     /// the first is still in force does nothing: it would otherwise save the
     /// values this coordinator had just written and "restore" them at the end.
-    func adBreakDidBegin() {
+    ///
+    /// - Parameter policy: passed in rather than read from a session, so the
+    ///   rule can be exercised without one.
+    func adBreakDidBegin(pictureInPicture policy: VASTAdSession.PictureInPicturePolicy) {
         guard let controls else { return }
         #if os(macOS)
         guard savedControlsStyle == nil else { return }
@@ -122,6 +146,12 @@ final class VASTPlaybackControlsCoordinator {
         savedSpeeds = controls.speeds
         controls.speeds = []
         #endif
+
+        // The other two policies mean the window is the viewer's, and taking the
+        // switch away there would be withdrawing something that works.
+        guard policy == .suspended else { return }
+        savedAllowsPictureInPicture = controls.allowsPictureInPicturePlayback
+        controls.allowsPictureInPicturePlayback = false
     }
 
     func adBreakDidEnd() {
@@ -151,5 +181,9 @@ final class VASTPlaybackControlsCoordinator {
             savedSpeeds = nil
         }
         #endif
+        if let saved = savedAllowsPictureInPicture {
+            controls.allowsPictureInPicturePlayback = saved
+            savedAllowsPictureInPicture = nil
+        }
     }
 }

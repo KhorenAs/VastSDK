@@ -61,7 +61,7 @@ extension VASTAdSession {
 
         // And the host's own controls, for the same reason and one step closer:
         // the scrubber in the app is the one the viewer reaches first.
-        playbackControls?.adBreakDidBegin()
+        playbackControls?.adBreakDidBegin(pictureInPicture: configuration.pictureInPicture)
 
         // Likewise the system transport: the seek controls have to be gone
         // before a creative is what they would be seeking.

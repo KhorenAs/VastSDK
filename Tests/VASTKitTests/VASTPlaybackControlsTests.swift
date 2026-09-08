@@ -57,13 +57,13 @@ final class VASTPlaybackControlsCoordinatorTests: XCTestCase {
 
         #if os(macOS)
         controls.controlsStyle = .floating
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         XCTAssertEqual(controls.controlsStyle, .none, "the pane still carries a timeline")
         coordinator.adBreakDidEnd()
         XCTAssertEqual(controls.controlsStyle, .floating)
         #else
         controls.requiresLinearPlayback = false
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         XCTAssertTrue(controls.requiresLinearPlayback, "the creative can be scrubbed past")
         XCTAssertTrue(controls.speeds.isEmpty, "a 2x ad is watched in half the time")
         coordinator.adBreakDidEnd()
@@ -81,12 +81,12 @@ final class VASTPlaybackControlsCoordinatorTests: XCTestCase {
 
         #if os(macOS)
         controls.controlsStyle = .none
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         coordinator.adBreakDidEnd()
         XCTAssertEqual(controls.controlsStyle, .none)
         #else
         controls.requiresLinearPlayback = true
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         coordinator.adBreakDidEnd()
         XCTAssertTrue(controls.requiresLinearPlayback)
         #endif
@@ -100,14 +100,14 @@ final class VASTPlaybackControlsCoordinatorTests: XCTestCase {
 
         #if os(macOS)
         controls.controlsStyle = .inline
-        coordinator.adBreakDidBegin()
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         coordinator.adBreakDidEnd()
         XCTAssertEqual(controls.controlsStyle, .inline)
         #else
         controls.requiresLinearPlayback = false
-        coordinator.adBreakDidBegin()
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         coordinator.adBreakDidEnd()
         XCTAssertFalse(controls.requiresLinearPlayback)
         #endif
@@ -121,15 +121,54 @@ final class VASTPlaybackControlsCoordinatorTests: XCTestCase {
 
         #if os(macOS)
         controls.controlsStyle = .floating
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         coordinator.invalidate()
         XCTAssertEqual(controls.controlsStyle, .floating)
         #else
         controls.requiresLinearPlayback = false
-        coordinator.adBreakDidBegin()
+        coordinator.adBreakDidBegin(pictureInPicture: .allowed)
         coordinator.invalidate()
         XCTAssertFalse(controls.requiresLinearPlayback)
         #endif
+    }
+
+    /// The one Picture in Picture lever an AVKit host has, and the only policy
+    /// that may pull it: under the other two the window is the viewer's, and
+    /// switching it off would withdraw something that works.
+    func testTheWindowIsRefusedOnlyUnderSuspended() {
+        for policy in [VASTAdSession.PictureInPicturePolicy.allowed, .pausesAd] {
+            let controls = PlatformPlayerControls()
+            controls.allowsPictureInPicturePlayback = true
+            let coordinator = VASTPlaybackControlsCoordinator(controls: controls)
+
+            coordinator.adBreakDidBegin(pictureInPicture: policy)
+            XCTAssertTrue(controls.allowsPictureInPicturePlayback, "withdrawn under \(policy)")
+            coordinator.adBreakDidEnd()
+            XCTAssertTrue(controls.allowsPictureInPicturePlayback)
+        }
+
+        let controls = PlatformPlayerControls()
+        controls.allowsPictureInPicturePlayback = true
+        let coordinator = VASTPlaybackControlsCoordinator(controls: controls)
+
+        coordinator.adBreakDidBegin(pictureInPicture: .suspended)
+        XCTAssertFalse(controls.allowsPictureInPicturePlayback, "the ad can leave for the window")
+        coordinator.adBreakDidEnd()
+        XCTAssertTrue(controls.allowsPictureInPicturePlayback, "the window is the host's again")
+    }
+
+    /// A host that never allowed the window does not get it switched on for it.
+    /// `true` is iOS and tvOS's default here, so restoring from a default rather
+    /// than from what was saved would be wrong in the commoner direction on
+    /// macOS, where the default is `false`.
+    func testAHostThatRefusedTheWindowKeepsRefusingIt() {
+        let controls = PlatformPlayerControls()
+        controls.allowsPictureInPicturePlayback = false
+        let coordinator = VASTPlaybackControlsCoordinator(controls: controls)
+
+        coordinator.adBreakDidBegin(pictureInPicture: .suspended)
+        coordinator.adBreakDidEnd()
+        XCTAssertFalse(controls.allowsPictureInPicturePlayback)
     }
 
     /// The session is the seam the host actually uses; it has to reach the same
