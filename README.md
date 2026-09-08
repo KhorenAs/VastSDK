@@ -3,6 +3,14 @@
 A native VAST 4.3 linear-video ad SDK for iOS, tvOS and macOS. No Google IMA, no
 VPAID, no WebView.
 
+4.3 is what it implements; 2.0, 3.0 and every 4.x **parse through the same
+version-tolerant path**, because real ad servers still send them. An element this
+SDK does not know is skipped rather than rejected, and the only document it
+refuses outright is a pre-3.0 one — whose root is not `<VAST>` at all — which
+gets VAST error 102 `versionNotSupported`, the code the specification reserves
+for it. What an older tag does not get is whatever the table below marks `❌`,
+VPAID first among them.
+
 ```swift
 .package(url: "https://github.com/KhorenAs/VastSDK.git", from: "1.0.0")
 ```
@@ -16,7 +24,7 @@ Sources/
   VASTKit/    player + UI binding
   Harness/    runnable logic harness: `swift run Harness`
 Examples/     VASTDemo.xcodeproj — SwiftUIDemo · UIKitDemo · AppKitDemo
-Tests/        266 tests
+Tests/        275 tests
 ```
 
 Android and Web get their own repositories rather than empty folders here. The
@@ -224,6 +232,7 @@ watched in half the time and every quartile still fires.
 
 | | |
 |---|---|
+| VAST 2.0 · 3.0 · 4.0–4.3 documents | ✅ one version-tolerant parser — a pre-3.0 root gets error 102 |
 | Linear ads | ✅ |
 | Skippable Linear (`skipoffset`) | ✅ |
 | Ad Pods (`sequence`) + stand-alone substitution | ✅ |
@@ -375,7 +384,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 266 tests
+swift test                  # 275 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 

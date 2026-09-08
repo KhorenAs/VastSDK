@@ -111,7 +111,11 @@ Everything above is closed except item 7. What has come up since, unclosed:
   `requiresLinearPlayback`, the delegate forwarding, and whether iOS keeps the
   window open across `replaceCurrentItem`, and whether a pause from the window's
   own button arrives as the `timeControlStatus` change the session now reports on,
-  are all still reasoned rather than observed. The same goes for the Now Playing
+  are all still reasoned rather than observed. `registerPlaybackControls` joins
+  the list: that the host's scrubber, speed menu and — under `.suspended` — its
+  `allowsPictureInPicturePlayback` are taken for the break and given back exactly
+  as they were is covered by tests against a real `AVPlayerView`, but nobody has
+  watched it happen on a screen. The same goes for the Now Playing
   transport that came with it: the borrowing and giving back is covered by tests,
   because `MPRemoteCommandCenter` is real in a test process, but whether the lock
   screen actually loses its scrubber for the break has only been reasoned. The
