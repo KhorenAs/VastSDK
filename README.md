@@ -24,7 +24,7 @@ Sources/
   VASTKit/    player + UI binding
   Harness/    runnable logic harness: `swift run Harness`
 Examples/     VASTDemo.xcodeproj — SwiftUIDemo · UIKitDemo · AppKitDemo
-Tests/        275 tests
+Tests/        279 tests
 ```
 
 Android and Web get their own repositories rather than empty folders here. The
@@ -384,7 +384,7 @@ Each of these is a bug that was found and is now pinned by a test.
 
 ```bash
 swift build                 # VASTCore + VASTKit
-swift test                  # 275 tests
+swift test                  # 279 tests
 swift run Harness           # tracking engine + parser against fixtures
 ```
 
