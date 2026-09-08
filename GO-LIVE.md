@@ -5,7 +5,7 @@ blocks the road rather than by how hard it is. Every item names where it lives,
 and the ones already closed are struck through with the commit that closed them —
 a list that only grows is a list nobody reads twice.
 
-State: `swift test` passes 229 tests with no warnings, and CI builds `VASTKit`
+State: `swift test` passes 279 tests with no warnings, and CI builds `VASTKit`
 for iOS, tvOS and macOS plus all three demos on every platform they claim.
 
 ## Blockers
