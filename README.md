@@ -428,3 +428,11 @@ what happens to a file no build ever reads.
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+## 1.8.1: conditional custom ad UI
+
+With `session.isHiddenUi = true`, `UiHideable=1` (or `UiHidden=1`)
+hands that creative's UI, including skip, to the host. Keep the default
+`skipPresentation: .sdk`; creatives without the flag retain SDK controls.
+Ownership follows each creative in a pod. Explicit `.host` and `.unsupported`
+skip policies retain their existing meaning.

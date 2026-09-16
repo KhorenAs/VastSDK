@@ -176,7 +176,7 @@ public struct VASTAdSurface: View {
     /// accessibility that every host would otherwise have to remember.
     @ViewBuilder
     private var skip: some View {
-        if session.configuration.skipPresentation == .sdk,
+        if session.effectiveSkipPresentation == .sdk,
            session.currentAd?.isSkippable == true {
             if let skipButton {
                 skipControl {

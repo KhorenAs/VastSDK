@@ -108,7 +108,22 @@ final class VASTUISettingsTests: XCTestCase {
     /// Suppressing the UI takes the skip control off the screen. If the host did
     /// not also take the control over, the promise `.sdk` makes is broken and the
     /// host has to hear about it.
-    func testHidingTheUIWithoutTakingTheSkipControlIsReported() {
+    func testUIAndSkipOwnershipFollowBothFlagsAcrossCreatives() {
+        let session = VASTAdSession(player: AVPlayer())
+        for optIn in [false, true] {
+            session.isHiddenUi = optIn
+            for flag in ["1", "0", "1", "0"] {
+                session.currentAd = Self.ad(uiSettings: "<UiHideable>\(flag)</UiHideable>", skipOffset: .time(5))
+                XCTAssertEqual(session.suppressesAdUI, optIn && flag == "1")
+                XCTAssertEqual(session.effectiveSkipPresentation, optIn && flag == "1" ? .host : .sdk)
+            }
+            session.currentAd = Self.ad(uiSettings: nil, skipOffset: .time(5))
+            XCTAssertFalse(session.suppressesAdUI)
+            XCTAssertEqual(session.effectiveSkipPresentation, .sdk)
+        }
+    }
+
+    func testHidingTheUITakesSkipControlForCurrentAd() {
         let recorder = DelegateRecorder()
         let session = VASTAdSession(player: AVPlayer())
         session.delegate = recorder
@@ -116,9 +131,9 @@ final class VASTUISettingsTests: XCTestCase {
 
         let ad = Self.ad(uiSettings: "<UiHidden>1</UiHidden>", skipOffset: .time(5))
         session.currentAd = ad
-        session.verifyHostDrawnUI(for: ad)
+        session.verifySkipSurface(for: ad)
 
-        XCTAssertEqual(recorder.skipControlComplaints, 1)
+        XCTAssertEqual(recorder.skipControlComplaints, 0)
     }
 
     /// The host took the control over, which is what it is meant to do here.
@@ -133,7 +148,7 @@ final class VASTUISettingsTests: XCTestCase {
 
         let ad = Self.ad(uiSettings: "<UiHidden>1</UiHidden>", skipOffset: .time(5))
         session.currentAd = ad
-        session.verifyHostDrawnUI(for: ad)
+        session.verifySkipSurface(for: ad)
 
         XCTAssertEqual(recorder.skipControlComplaints, 0)
     }
@@ -147,7 +162,7 @@ final class VASTUISettingsTests: XCTestCase {
 
         let ad = Self.ad(uiSettings: "<UiHidden>1</UiHidden>")
         session.currentAd = ad
-        session.verifyHostDrawnUI(for: ad)
+        session.verifySkipSurface(for: ad)
 
         XCTAssertEqual(recorder.skipControlComplaints, 0)
     }

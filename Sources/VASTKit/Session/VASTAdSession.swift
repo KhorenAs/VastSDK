@@ -51,10 +51,9 @@ public final class VASTAdSession: ObservableObject {
     /// Set it to `true` and the SDK reads the `uiSettings` UI-hidden key from the
     /// response. When the key is there the SDK draws nothing at all — no badge,
     /// no countdown, no click layer and no skip control — and the entire ad UI
-    /// becomes yours. Pair it with `skipPresentation = .host`, which is the
-    /// statement that you accept that obligation; leaving it at `.sdk` is
-    /// reported through the delegate, because the control the SDK promised is
-    /// then on nobody's screen.
+    /// becomes yours, including skip. With the default `.sdk` skip policy,
+    /// ownership returns to the SDK for creatives without a UI-hidden flag.
+    /// The host must provide controls for the creatives whose UI it takes over.
     ///
     /// `suppressesAdUI` is the answer for the ad currently playing.
     @Published public var isHiddenUi = false
@@ -115,6 +114,12 @@ public final class VASTAdSession: ObservableObject {
     public var suppressesAdUI: Bool {
         guard isHiddenUi, let ad = currentAd else { return false }
         return ad.isUIHidden
+    }
+
+    /// Hidden UI hands the current creative's controls to the host. Otherwise
+    /// retain the configured skip policy, including explicit host/unsupported modes.
+    public var effectiveSkipPresentation: SkipPresentation {
+        suppressesAdUI && configuration.skipPresentation == .sdk ? .host : configuration.skipPresentation
     }
 
     public weak var delegate: (any iVASTAdSessionDelegate)?
@@ -241,7 +246,7 @@ public final class VASTAdSession: ObservableObject {
     /// happened yet.
     func noteSkipControl(size: CGSize) {
         surfacePresence.update(skipControlSize: size)
-        guard configuration.skipPresentation == .sdk,
+        guard effectiveSkipPresentation == .sdk,
               let ad = currentAd, ad.isSkippable,
               !reportedSkipControlProblem,
               let diagnosis = surfacePresence.skipControlDiagnosis
@@ -271,22 +276,6 @@ public final class VASTAdSession: ObservableObject {
         #endif
     }
 
-    /// The ad UI is being suppressed at the response's request, but the host
-    /// never took the skip control over. Reported rather than refused: unlike
-    /// `skipPresentation = .unsupported`, the host did opt in here — it just
-    /// opted in to half of what that means.
-    func verifyHostDrawnUI(for ad: VASTAd) {
-        guard suppressesAdUI, ad.isSkippable, configuration.skipPresentation == .sdk else { return }
-        let reason = """
-        the response asked for host-drawn UI and isHiddenUi permits it, so the SDK \
-        is drawing nothing — but skipPresentation is still .sdk, which promised \
-        this skippable ad a control. Set skipPresentation to .host and draw one, \
-        or leave isHiddenUi false for this break.
-        """
-        VASTLog.compliance.warning("skip control unavailable: \(reason, privacy: .public)")
-        delegate?.session(self, skipControlUnavailableFor: ad, reason: reason)
-    }
-
     /// Checks the one compliance promise the SDK cannot verify on its own, at the
     /// moment it actually matters: the control is due, so it had better be
     /// somewhere a viewer can reach.
@@ -296,7 +285,7 @@ public final class VASTAdSession: ObservableObject {
         // where the ad is.
         reportPictureInPictureUnreachableUI()
 
-        guard configuration.skipPresentation == .sdk, ad.isSkippable else { return }
+        guard effectiveSkipPresentation == .sdk, ad.isSkippable else { return }
         // Already reported at the start of the ad, and no control was drawn to
         // measure — complaining again when the offset elapses says nothing new.
         guard !suppressesAdUI else { return }
@@ -356,7 +345,7 @@ public final class VASTAdSession: ObservableObject {
     private func reportPictureInPictureUnreachableUI() {
         guard isInPictureInPicture, canSkip, !reportedPictureInPictureProblem,
               let ad = currentAd, ad.isSkippable,
-              configuration.skipPresentation == .sdk, !suppressesAdUI
+              effectiveSkipPresentation == .sdk, !suppressesAdUI
         else { return }
         reportedPictureInPictureProblem = true
 

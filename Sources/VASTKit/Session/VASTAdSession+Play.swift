@@ -150,7 +150,7 @@ extension VASTAdSession {
         // §2.3: "nor should the media player play the Skippable Ad as a Linear
         // Ad (without skip controls)". A host that cannot offer the control is
         // told to expect a trafficking error, not handed a compliance breach.
-        if ad.isSkippable, configuration.skipPresentation == .unsupported {
+        if ad.isSkippable, effectiveSkipPresentation == .unsupported {
             return fail(.trafficking, ad: ad, engine: &engine)
         }
 
@@ -187,7 +187,6 @@ extension VASTAdSession {
 
         state = .playing
         verifyClickPath(for: ad)
-        verifyHostDrawnUI(for: ad)
         // A window that was already open raises no callback of its own, so the
         // policy is re-asked here rather than only on the way in.
         pictureInPicture?.adDidStart()
